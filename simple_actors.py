@@ -20,11 +20,13 @@ class ActorA(object):
         self.clear_inputs()
 
     def put_input(self, port, value):
+        self.logger.debug('put_input')
         self.inputs[port].append(value)
         self.eval_inputs()
 
     def eval_inputs(self):
         # input complete logic
+        self.logger.debug('eval_inputs')
         if self.inputs.get('input_1'):
             self.fire()
 
@@ -39,12 +41,14 @@ class ActorA(object):
         for i, v in self.inputs.iteritems():
             for vv in v:
                 self.results['result_1'] += self.config * vv
-        self.clear_inputs()
         self.logger.debug('results = %s' % self.results)
+        # clear inputs before results are published
+        self.clear_inputs()
         for result, connections in self.connections.iteritems():
             for connection in connections:
-                self.logger.debug('--> %s.put_input("%s", %s' %
-                    (connection['actor'].name, connection['port'], str(self.results[result])))
+                self.logger.debug('%s --> %s.%s' %
+                                  (result, connection['actor'].name,
+                                   connection['port']))
                 connection['actor'].put_input(connection['port'], self.results[result])
 
 
@@ -53,4 +57,3 @@ if __name__ == '__main__':
     b = ActorA('b', -2)
     a.connections['result_1'] = [{'actor': b, 'port': 'input_1'}]
     a.put_input('input_1', 3)  # keep a.input_1 = 3 ???
-

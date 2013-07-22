@@ -8,7 +8,7 @@ class ActorA(object):
 
     count = 0
 
-    def __init__(self, name, config, in_ports=('input_1', ), out_ports=('output_1', )):
+    def __init__(self, name, config, in_ports=('input_1', )):
         super(ActorA, self).__init__()
         self.__class__.count += 1
         self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
@@ -16,7 +16,6 @@ class ActorA(object):
         self.name = name
         self.config = config
         self.in_ports = list(in_ports)
-        self.out_ports = list(out_ports)
         # list of connected ports
         # results_id -> [target1, target2, ...]
         self.connections = {}
@@ -66,7 +65,7 @@ class ActorB(object):
 
     count = 0
 
-    def __init__(self, name, config, in_ports=('input_1', ), out_ports=('output_1', 'output_2')):
+    def __init__(self, name, config, in_ports=('input_1', )):
         super(ActorB, self).__init__()
         self.__class__.count += 1
         self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
@@ -74,7 +73,6 @@ class ActorB(object):
         self.name = name
         self.config = config
         self.in_ports = list(in_ports)
-        self.out_ports = list(out_ports)
         # list of connected ports
         # results_id -> [target1, target2, ...]
         self.connections = {}

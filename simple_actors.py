@@ -19,7 +19,6 @@ class ActorA(object):
         # list of connected ports
         # results_id -> [target1, target2, ...]
         self.connections = {}
-        results = {}
         self.inputs = {}
         self.clear_inputs()
 
@@ -76,7 +75,6 @@ class ActorB(object):
         # list of connected ports
         # results_id -> [target1, target2, ...]
         self.connections = {}
-        results = {}
         self.inputs = {}
         self.clear_inputs()
 

@@ -5,8 +5,13 @@ logging.basicConfig(level=logging.DEBUG)
 
 class ActorA(object):
     """docstring for ActorA"""
+
+    count = 0
+
     def __init__(self, name, config, in_ports=('input_1', ), out_ports=('output_1', )):
         super(ActorA, self).__init__()
+        self.__class__.count += 1
+        self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
         self.logger = logging.getLogger(name)
         self.name = name
         self.config = config

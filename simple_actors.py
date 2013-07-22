@@ -40,15 +40,19 @@ class ActorA(object):
 
     def fire(self, input_1=None):
         self.logger.debug('inside fire')
+        # keyword arguments enable direct calls
+        if input_1 is None:
+            input_1 = self.inputs['input_1']
+        # for distributed runs a flag should be used for
+        # signaling input acceptance
+        self.clear_inputs()
         results = {}
         res = 0
-        for i, v in self.inputs.iteritems():
-            for vv in v:
-                res += self.config * vv
+        for vv in input_1:
+            res += self.config * vv
         results['result_1'] = res
         self.logger.debug('results = %s' % results)
         # clear inputs before results are published
-        self.clear_inputs()
         for result, connections in self.connections.iteritems():
             for connection in connections:
                 self.logger.debug('%s --> %s.%s' %
@@ -103,6 +107,7 @@ class ActorB(object):
             for vv in v:
                 res += self.config * vv
 
+        # test simple branching
         if abs(res) < 100:
             results['result_1'] = res
         else:

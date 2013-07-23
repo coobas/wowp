@@ -90,7 +90,7 @@ class ActorB(object):
 
     def eval_inputs(self):
         # input complete logic
-        self.logger.debug('eval_inputs')
+        self.logger.debug('eval_inputs: %s' % str(self.inputs))
         if self.inputs.get('input_1'):
             self.fire()
 
@@ -112,9 +112,16 @@ class ActorB(object):
             results['result_1'] = res
         else:
             results['result_2'] = res
-
         self.logger.debug('results = %s' % results)
+
+        # do this with a decorator
+        self.apply_outputs(results)
+
+    def apply_outputs(self, results):
+        '''Apply outputs (results) to output ports
+        '''
         # clear inputs before results are published
+        self.logger
         self.clear_inputs()
         for result, connections in self.connections.iteritems():
             for connection in connections:

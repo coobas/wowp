@@ -1,6 +1,53 @@
 import logging
+import networkx as nx
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+class Workflow(object):
+    """docstring for Workflow"""
+    def __init__(self):
+        super(Workflow, self).__init__()
+        self.actors = []
+        self.graph = None
+        # self.build_graph()
+
+    def add(self, actor):
+        self.actors.append(actor)
+
+    def build_graph(self):
+        self.graph = nx.DiGraph()
+        for phase in (0, 1):
+            for actor in self.actors:
+                if phase == 0:
+                    self.graph.add_node(actor.id, type='a')
+                    for in_port in actor.input_ports():
+                        port_node = '%s:%s' % (actor.id, in_port)
+                        self.graph.add_node(port_node, type='i')
+                        self.graph.add_edge(port_node, actor.id)
+                        print('%s -> %s' % (port_node, actor.id))
+                    for out_port in actor.output_ports():
+                        port_node = '%s:%s' % (actor.id, out_port)
+                        self.graph.add_node(port_node, type='o')
+                        self.graph.add_edge(actor.id, port_node)
+                        print('%s -> %s' % (actor.id, port_node))
+                if phase == 1:
+                    for out_port, conns in actor.connections.iteritems():
+                        source_node = '%s:%s' % (actor.id, out_port)
+                        for conn in conns:
+                            dest_node = '%s:%s' % (conn['actor'].id, conn['port'])
+                            self.graph.add_edge(source_node, dest_node)
+                            print('%s -> %s' % (source_node, dest_node))
+
+    def draw_graph(self):
+        import matplotlib.pyplot as plt
+        # pos = nx.graphviz_layout(self.graph, prog='dot')
+        colors = {'a': 'r', 'i': 'g', 'o': 'y'}
+        node_color = [colors[self.graph.node[n]['type']] for n in self.graph.nodes()]
+        plt.figure()
+        # nx.draw(self.graph, pos=pos, node_color=node_color)
+        nx.draw(self.graph, node_color=node_color)
+        plt.show()
 
 
 class Actor(object):
@@ -164,3 +211,11 @@ if __name__ == '__main__':
     b1.connect_to('result_1', a1, 'input_1')
 
     a1.put_input('input_1', 2)  # keep a.input_1 = 3 ???
+
+    w = Workflow()
+    w.add(a1)
+    w.add(a2)
+    w.add(b1)
+    w.build_graph()
+    w.draw_graph()
+

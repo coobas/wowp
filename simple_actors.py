@@ -13,7 +13,7 @@ class Actor(object):
         self.__class__.count += 1
         self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
         self.name = name if name is not None else self.id
-        self.logger = logging.getLogger(self.name)
+        self.logger = logging.getLogger(self.id)
         self.connections = {}
         self.inputs = {}
 
@@ -29,10 +29,29 @@ class Actor(object):
         # setup dynamic input ports
         self.inputs = {port: [] for port in ports}
 
+    def setup_output_ports(self, ports):
+        # setup dynamic input ports
+        self.connections = {port: [] for port in ports}
+
+    def input_ports(self):
+        # TODO make it a property with setter
+        return self.inputs.keys()
+
+    def output_ports(self):
+        # TODO similar to input_ports
+        return self.connections.keys()
+
     def clear_inputs(self):
         self.logger.debug('clear inputs')
         for port in self.inputs:
             self.inputs[port] = []
+
+    def connect_to(self, source_port, dest_actor, dest_port):
+        if source_port not in self.output_ports:
+            raise Exception('output port %s is not defined' % source_port)
+        if dest_port not in dest_actor.input_ports:
+            raise Exception('input port %s not defined in %s' % (dest_port, dest_actor.id))
+        self.connections[source_port].append = {'actor': dest_actor, 'port': dest_port}
 
 
 class ActorA(Actor):
@@ -75,24 +94,15 @@ class ActorA(Actor):
         self.logger.debug('fire ends')
 
 
-class ActorB(object):
+class ActorB(Actor):
     """docstring for ActorA"""
 
     count = 0
 
     def __init__(self, name, config, in_ports=('input_1', )):
-        super(ActorB, self).__init__()
-        self.__class__.count += 1
-        self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
-        self.logger = logging.getLogger(name)
-        self.name = name
+        super(ActorB, self).__init__(name=name)
         self.config = config
-        self.in_ports = list(in_ports)
-        # list of connected ports
-        # results_id -> [target1, target2, ...]
-        self.connections = {}
-        self.inputs = {}
-        self.clear_inputs()
+        self.setup_input_ports(in_ports)
 
     def put_input(self, port, value):
         self.logger.debug('received input %s' % str(value))
@@ -105,11 +115,6 @@ class ActorB(object):
         self.logger.debug('eval_inputs: %s' % str(self.inputs))
         if self.inputs.get('input_1'):
             self.fire()
-
-    def clear_inputs(self):
-        self.logger.debug('clear inputs')
-        for port in self.in_ports:
-            self.inputs[port] = []
 
     def fire(self):
         self.logger.debug('inside fire')

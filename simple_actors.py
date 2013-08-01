@@ -47,11 +47,11 @@ class Actor(object):
             self.inputs[port] = []
 
     def connect_to(self, source_port, dest_actor, dest_port):
-        if source_port not in self.output_ports:
+        if source_port not in self.output_ports():
             raise Exception('output port %s is not defined' % source_port)
-        if dest_port not in dest_actor.input_ports:
+        if dest_port not in dest_actor.input_ports():
             raise Exception('input port %s not defined in %s' % (dest_port, dest_actor.id))
-        self.connections[source_port].append = {'actor': dest_actor, 'port': dest_port}
+        self.connections[source_port].append({'actor': dest_actor, 'port': dest_port})
 
 
 class ActorA(Actor):
@@ -63,6 +63,7 @@ class ActorA(Actor):
         super(ActorA, self).__init__(name=name)
         self.config = config
         self.setup_input_ports(in_ports)
+        self.setup_output_ports(('result_1', ))
 
     def eval_inputs(self):
         # input complete logic
@@ -97,12 +98,11 @@ class ActorA(Actor):
 class ActorB(Actor):
     """docstring for ActorA"""
 
-    count = 0
-
     def __init__(self, name, config, in_ports=('input_1', )):
         super(ActorB, self).__init__(name=name)
         self.config = config
         self.setup_input_ports(in_ports)
+        self.setup_output_ports(('result_1', 'result_2'))
 
     def put_input(self, port, value):
         self.logger.debug('received input %s' % str(value))
@@ -154,10 +154,13 @@ class ActorB(Actor):
 if __name__ == '__main__':
     a1 = ActorA('a1', 2)
     a2 = ActorA('a2', -2)
-    a1.connections['result_1'] = [{'actor': a2, 'port': 'input_1'}]
+    # a1.connections['result_1'] = [{'actor': a2, 'port': 'input_1'}]
+    a1.connect_to('result_1', a2, 'input_1')
 
     b1 = ActorB('b1', 1)
-    a2.connections['result_1'] = [{'actor': b1, 'port': 'input_1'}]
-    b1.connections['result_1'] = [{'actor': a1, 'port': 'input_1'}]
+    # a2.connections['result_1'] = [{'actor': b1, 'port': 'input_1'}]
+    a2.connect_to('result_1', b1, 'input_1')
+    # b1.connections['result_1'] = [{'actor': a1, 'port': 'input_1'}]
+    b1.connect_to('result_1', a1, 'input_1')
 
     a1.put_input('input_1', 2)  # keep a.input_1 = 3 ???

@@ -1,1 +1,1 @@
-from .component import Component, Actor
+from .components import Component, Actor, Workflow

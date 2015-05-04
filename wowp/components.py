@@ -1,5 +1,6 @@
 import logging
 from .util import ListDict
+from collections import deque
 
 # set up logger
 logger = logging.getLogger()
@@ -40,6 +41,12 @@ class Component(object):
     def outports(self):
         raise TypeError('Cannot delete outports directly')
 
+    def put_outputs(self, **kwargs):
+        """Put outputs to ports, specified by port_name, value pairs
+        """
+        for port_name, value in kwargs.items():
+            self.outports[port_name].put(value)
+
 
 class Actor(Component):
     pass
@@ -56,11 +63,11 @@ class Workflow(Composite):
 class Ports(object):
     """Port collection
     """
-    def __init__(self, port_class, actor, type=None):
+    def __init__(self, port_class, owner, type=None):
         self._ports = ListDict()
         # port class is used to create new ports
         self._port_class = port_class
-        self._actor = actor
+        self._owner = owner
         self._type = type
 
     def __new_port(self, name):
@@ -87,10 +94,11 @@ class Ports(object):
 
 
 class Port(object):
-    def __init__(self, name, actor, type=None):
+    def __init__(self, name, owner, type=None):
         self.name = name
-        self.actor = actor
+        self.owner = owner
         self.type = type
+        self.buffer = deque()
         self._connections = []
 
     @property
@@ -124,17 +132,22 @@ class Port(object):
 class OutPort(Port):
     """A single, named output port
     """
-    pass
+    def put(self, value):
+        """Put output value
+
+        Value is sent to connected ports (or stored if not connected)
+        """
+        for conn in self._connections:
+            # output to all connected ports
+            conn.put(value)
+        else:
+            # store is nothing is connected
+            self.buffer.appendleft(value)
 
 
 class InPort(Port):
     """A single, named input port
     """
-    def __init__(self, name, actor, type=None):
-        self.name = name
-        self.actor = actor
-        self.type = type
-        self._connections = []
 
     def __iadd__(self, other):
         self.connect(other)
@@ -145,6 +158,24 @@ class InPort(Port):
         self.disconnect(other)
         # self must be returned because __setattr__ or __setitem__ is finally used
         return self
+
+    def put(self, value):
+        """Put single input
+        """
+        self.buffer.appendleft(value)
+        self.owner.on_input()
+
+    def pop(self):
+        """Get single input
+        """
+        self.buffer.pop()
+
+    def pop_all(self):
+        """Get all inputs
+        """
+        values = self.buffer
+        self.buffer = deque()
+        return values
 
 
 def valid_name(name):
@@ -206,54 +237,3 @@ def valid_name(name):
 #         # nx.draw(self.graph, pos=pos, node_color=node_color)
 #         nx.draw(self.graph, node_color=node_color)
 #         plt.show()
-
-
-# class Actor(object):
-#     """Actor base class"""
-#
-#     count = 0
-#
-#     def __init__(self, name=None):
-#         super(Actor, self).__init__()
-#         self.__class__.count += 1
-#         self.id = "%s/%i" % (self.__class__.__name__, self.__class__.count)
-#         self.name = name if name is not None else self.id
-#         self.logger = logging.getLogger(self.id)
-#         self.connections = {}
-#         self.inputs = {}
-#
-#     def put_input(self, port, value):
-#         self.logger.debug('put_input')
-#         self.inputs[port].append(value)
-#         fire = self.eval_inputs()
-#         if fire:
-#             # notice supervisor here
-#             self.fire()
-#
-#     def setup_input_ports(self, ports):
-#         # setup dynamic input ports
-#         self.inputs = {port: [] for port in ports}
-#
-#     def setup_output_ports(self, ports):
-#         # setup dynamic input ports
-#         self.connections = {port: [] for port in ports}
-#
-#     def input_ports(self):
-#         # TODO make it a property with setter
-#         return self.inputs.keys()
-#
-#     def output_ports(self):
-#         # TODO similar to input_ports
-#         return self.connections.keys()
-#
-#     def clear_inputs(self):
-#         self.logger.debug('clear inputs')
-#         for port in self.inputs:
-#             self.inputs[port] = []
-#
-#     def connect_to(self, source_port, dest_actor, dest_port):
-#         if source_port not in self.output_ports():
-#             raise Exception('output port %s is not defined' % source_port)
-#         if dest_port not in dest_actor.input_ports():
-#             raise Exception('input port %s not defined in %s' % (dest_port, dest_actor.id))
-#         self.connections[source_port].append({'actor': dest_actor, 'port': dest_port})

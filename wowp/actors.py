@@ -1,19 +1,43 @@
 from .components import Actor
+import inspect
+from . import logger
 
-class PlainActor(Actor):
+class FuncActor(Actor):
     """Actor defined simply by a function
     """
-    def __init__(self, func, outports=('out', )):
+    # TODO create a derived class instead of an instance
+    def __init__(self, func, outports='out'):
+        super(FuncActor, self).__init__(name=func.__name__)
+        # get function signature
+        sig = inspect.signature(func)
         self.func = func
-        # TODO derive inports from func signature
-        # TODO setup outports
+        # derive inports from func signature
+        for par in sig.parameters.values():
+            self.inports.append(par.name)
+        if sig.return_annotation is not inspect.Signature.empty:
+            # if func has a return annotation, use it for outports names
+            outports = sig.return_annotation
+        # setup outports
+        if isinstance(outports, str):
+            outports = (outports, )
+        for name in outports:
+            self.outports.append(name)
 
     def on_input(self):
-        # TODO check input ports
-        # + call fire if enough inputs
+        print('on_input')
+        if all(port for port in self.inports):
+            self.fire()
 
     def fire(self):
+        print('fire')
         args = (port.pop() for port in self.inports)
-        func_res = self.func(args)
-        for out_port, value in zip(self.outports, func_res):
-            out_port.put(value)
+        func_res = self.func(*args)
+        if len(self.outports) > 1:
+            # iterate over ports and return values
+            for out_port, value in zip(self.outports, func_res):
+                out_port.put(value)
+        elif self.outports:
+            self.outports[0].put(func_res)
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)

@@ -1,9 +1,6 @@
-import logging
 from .util import ListDict
 from collections import deque
-
-# set up logger
-logger = logging.getLogger()
+from . import logger
 
 
 class Component(object):
@@ -16,6 +13,16 @@ class Component(object):
         self.name = name
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
+
+    def on_input(self):
+        """This is a virtual method
+        """
+        raise NotImplementedError('Calling a virtual method')
+
+    def fire(self):
+        """This is a virtual method
+        """
+        raise NotImplementedError('Calling a virtual method')
 
     @property
     def inports(self):
@@ -64,14 +71,24 @@ class Ports(object):
     """Port collection
     """
     def __init__(self, port_class, owner, type=None):
+        # TODO port_class can differ for individual ports
         self._ports = ListDict()
         # port class is used to create new ports
         self._port_class = port_class
         self._owner = owner
         self._type = type
 
+    def __bool__(self):
+        return bool(self._ports)
+
+    def __len__(self):
+        return len(self._ports)
+
+    def __iter__(self):
+        return iter(self._ports.values())
+
     def __new_port(self, name):
-        return self._port_class(name=name, actor=self._actor, type=self._type)
+        return self._port_class(name=name, owner=self._owner, type=self._type)
 
     def __getitem__(self, item):
         # TODO add security
@@ -101,6 +118,9 @@ class Port(object):
         self.buffer = deque()
         self._connections = []
 
+    def __bool__(self):
+        return bool(self.buffer)
+
     @property
     def connections(self):
         return self._connections
@@ -127,6 +147,18 @@ class Port(object):
         else:
             other._connections.remove(self)
             self._connections.remove(other)
+
+    def pop(self):
+        """Get single input
+        """
+        return self.buffer.pop()
+
+    def pop_all(self):
+        """Get all inputs
+        """
+        values = self.buffer
+        self.buffer = deque()
+        return values
 
 
 class OutPort(Port):
@@ -164,18 +196,6 @@ class InPort(Port):
         """
         self.buffer.appendleft(value)
         self.owner.on_input()
-
-    def pop(self):
-        """Get single input
-        """
-        self.buffer.pop()
-
-    def pop_all(self):
-        """Get all inputs
-        """
-        values = self.buffer
-        self.buffer = deque()
-        return values
 
 
 def valid_name(name):

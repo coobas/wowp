@@ -32,12 +32,12 @@ class FuncActor(Actor):
         print('fire')
         args = (port.pop() for port in self.inports)
         func_res = self.func(*args)
-        if len(self.outports) > 1:
-            # iterate over ports and return values
-            for out_port, value in zip(self.outports, func_res):
-                out_port.put(value)
-        elif self.outports:
-            self.outports[0].put(func_res)
-
+        
+        if len(self.outports) == 1:
+            func_res = (func_res,)
+        # iterate over ports and return values
+        for out_port, value in zip(self.outports, func_res):
+            out_port.put(value)
+        
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)

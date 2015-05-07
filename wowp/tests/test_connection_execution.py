@@ -57,5 +57,26 @@ def test_two_to_one_connected():
 	assert func2(func1(in_value1), func1(in_value2)) == out_actor.outports['a'].pop()
 
 
+def test_three_in_line():
+	"""Three linearly connected function actors.
+
+	--func(.)--func(.)--func(.)--
+	"""
+	def func(x) -> ('x'):
+		return x * 2
+
+	actor1 = FuncActor(func)
+	actor2 = FuncActor(func)
+	actor3 = FuncActor(func)
+
+	actor2.inports['x'] += actor1.outports['x']
+	actor3.inports['x'] += actor2.outports['x']
+
+	in_value = 4
+	actor1.inports['x'].put(in_value)
+	
+	assert (func(func(func(in_value)))) == actor3.outports['x'].pop()
+
+
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

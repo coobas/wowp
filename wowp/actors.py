@@ -47,7 +47,7 @@ class LoopWhile(Actor):
     """While loop actor
     """
 
-    def __init__(self, name=None, condition_func=None):
+    def __init__(self, name=None, condition_func=None, inner_actor=None):
         super(LoopWhile, self).__init__(name=name)
         # self.inports.append('initial')
         self.inports.append('loop_in')
@@ -59,6 +59,13 @@ class LoopWhile(Actor):
             self.condition_func = None
         else:
             self.condition_func = condition_func
+        if inner_actor:
+            if len(inner_actor.inports) != 1:
+                raise RuntimeError("Inner actor has to have exactly one input port.")
+            if len(inner_actor.outports) != 1:
+                raise RuntimeError("Inner actor has to have exactly one output port.")
+            self.outports['loop_out'].connect(list(inner_actor.inports._ports.values())[0])
+            self.inports['loop_in'].connect(list(inner_actor.outports._ports.values())[0])
 
     def on_input(self):
         # an input arrived --> fire

@@ -41,6 +41,16 @@ def test_LoopWhileActor():
 
     assert(result == 10)
 
+def test_LoopWhileActorWithInner():
+    condition = lambda x: x < 10
+    def func(x) -> ('x'):
+        return x + 1    
+    fa = FuncActor(func)
+    lw = LoopWhile("a_loop", condition, inner_actor=fa)
+
+    lw.inports['loop_in'].put(0)
+    result = lw.outports['final'].pop()
+    assert(result == 10)
 
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

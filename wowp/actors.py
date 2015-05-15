@@ -24,12 +24,12 @@ class FuncActor(Actor):
             self.outports.append(name)
 
     def on_input(self):
-        print('on_input')
+        # print('on_input')
         if all(port for port in self.inports):
             self.fire()
 
     def fire(self):
-        print('fire')
+        # print('fire')
         args = (port.pop() for port in self.inports)
         func_res = self.func(*args)
         
@@ -41,3 +41,38 @@ class FuncActor(Actor):
         
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
+
+
+class LoopWhile(Actor):
+    """While loop actor
+    """
+
+    def __init__(self, name=None, condition_func=None):
+        super(LoopWhile, self).__init__(name=name)
+        # self.inports.append('initial')
+        self.inports.append('loop_in')
+        self.outports.append('loop_out')
+        self.outports.append('final')
+        if condition_func is None:
+            # TODO create in and out ports for condition
+            raise NotImplementedError('To be implemented')
+            self.condition_func = None
+        else:
+            self.condition_func = condition_func
+
+    def on_input(self):
+        # an input arrived --> fire
+        # the condition is evaluated in fire
+        self.fire()
+
+    def fire(self):
+        input_val = self.inports['loop_in'].pop()
+        if self.condition_func:
+            if self.condition_func(input_val):
+                self.outports['loop_out'].put(input_val)
+            else:
+                self.outports['final'].put(input_val)
+        else:
+            # TODO use condition via ports
+            raise NotImplementedError('To be implemented')
+        

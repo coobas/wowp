@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor
+from wowp.actors import FuncActor, LoopWhile
 import nose
 
 
@@ -25,6 +25,21 @@ def test_FuncActor_call():
     fa = FuncActor(func)
 
     assert func(x, y) == fa(x, y)
+
+def test_LoopWhileActor():
+    condition = lambda x: x < 10
+    def func(x) -> ('x'):
+        return x + 1
+    fa = FuncActor(func)
+    lw = LoopWhile("a_loop", condition)
+
+    fa.inports['x'] += lw.outports['loop_out']
+    lw.inports['loop_in'] += fa.outports['x']
+
+    lw.inports['loop_in'].put(0)
+    result = lw.outports['final'].pop()
+
+    assert(result == 10)
 
 
 if __name__ == '__main__':

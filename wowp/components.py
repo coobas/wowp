@@ -1,16 +1,18 @@
 from .util import ListDict
 from collections import deque
 from . import logger
+from .schedulers import NaiveScheduler
 
 
 class Component(object):
     """Base WOWP component class
     """
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, scheduler=NaiveScheduler()):
         if name is None:
             name = self.__class__.__name__.lower()
         self.name = name
+        self.scheduler = scheduler
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
@@ -171,7 +173,7 @@ class OutPort(Port):
         """
         for conn in self._connections:
             # output to all connected ports
-            conn.put(value)
+            self.owner.scheduler.put_value(conn, value)
         else:
             # store is nothing is connected
             self.buffer.appendleft(value)

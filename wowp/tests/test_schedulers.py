@@ -1,5 +1,5 @@
 from wowp.actors import FuncActor, LoopWhile
-from wowp.schedulers import LinearizedScheduler, RandomScheduler
+from wowp.schedulers import LinearizedScheduler, RandomScheduler, ThreadedScheduler
 
 import nose
 
@@ -21,8 +21,7 @@ def test_LinearizedScheduler_loop1000():
     result = lw.outports['final'].pop()
     assert(result == 1000)
 
-
-def test_RandomScheduler_tree512():
+def _run_tree_512_test(scheduler):
     def sum(a, b) -> ('a'):
         return a + b
     def ident(a) -> ('a'):
@@ -40,12 +39,10 @@ def test_RandomScheduler_tree512():
             summer = FuncActor(sum)
             summer.inports['a'].connect(children[0].outports['a'])
             summer.inports['b'].connect(children[1].outports['a'])
-            return summer        
-
-    scheduler = RandomScheduler()
+            return summer
 
     first = FuncActor(ident)
-    
+
     power = 8
     last = _split_and_sum(first, power)
 
@@ -53,6 +50,18 @@ def test_RandomScheduler_tree512():
     scheduler.execute()
 
     assert(2 ** power == last.outports['a'].pop())
+
+def test_RandomScheduler_tree512():
+    scheduler = RandomScheduler()
+    _run_tree_512_test(scheduler)
+
+def test_ThreadedScheduler_tree512():
+    scheduler = ThreadedScheduler(max_threads=8)
+    _run_tree_512_test(scheduler)
+
+def test_LinearizedScheduler_tree512():
+    scheduler = LinearizedScheduler()
+    _run_tree_512_test(scheduler)
 
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

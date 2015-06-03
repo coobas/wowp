@@ -93,6 +93,10 @@ class Ports(object):
         return self._port_class(name=name, owner=self._owner, type=self._type)
 
     def __getitem__(self, item):
+        """
+
+        :rtype: Port
+        """
         # TODO add security
         return self._ports[item]
 

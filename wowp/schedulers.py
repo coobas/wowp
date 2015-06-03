@@ -1,4 +1,5 @@
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import random
 
 
@@ -34,19 +35,16 @@ class RandomScheduler(LinearizedScheduler):
             in_port, value = self.execution_queue.pop()
             in_port.put(value)
 
-class ThreadedScheduler(object):
-    """Scheduler that uses thread pool from concurrent.futures module."""
-    def __init__(self, max_threads=4):
-        from concurrent.futures import ThreadPoolExecutor
-        self.executor = ThreadPoolExecutor(max_workers=max_threads)
+
+class _ConcurrentScheduler(object):
+    def __init__(self, executor_class, max_threads=4):
+        self.executor = executor_class(max_workers=max_threads)
         self.running = False
         self.begin_queue = deque()
 
     def put_value(self, in_port, value):
-
-        # Def
         if self.running:
-            self.executor.submit(lambda: in_port.put(value))
+            self.executor.submit(in_port.put, value)
         else:
             self.begin_queue.appendleft((in_port, value))
 
@@ -57,3 +55,8 @@ class ThreadedScheduler(object):
                 in_port, value = self.begin_queue.pop()
                 self.put_value(in_port, value)
         self.running = False
+
+class ThreadedScheduler(_ConcurrentScheduler):
+    """Scheduler that uses thread pool from concurrent.futures module."""
+    def __init__(self,  max_threads=4):
+        super(ThreadedScheduler, self).__init__(ThreadPoolExecutor, max_threads=max_threads)

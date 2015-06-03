@@ -63,5 +63,40 @@ def test_LinearizedScheduler_tree512():
     scheduler = LinearizedScheduler()
     _run_tree_512_test(scheduler)
 
+def test_ThrededScheduler_creates_threads_and_executes_all():
+    """Test whether more threads are being used by the scheduler"""
+    thread_ids = set()
+    jobs_executed = 0
+
+    def func(x) -> ('x'):
+        nonlocal jobs_executed
+        import threading
+        thread_ids.add(threading.current_thread().ident)
+        jobs_executed += 1
+        return x
+
+    branch_count = 40    # times 2
+    branch_length = 10
+    thread_count = 8
+
+    scheduler = ThreadedScheduler(max_threads=thread_count)
+
+    for i in range(branch_count):
+        actors = []
+
+        for j in range(branch_length):
+            actor = FuncActor(func)
+            if j == 0:
+                scheduler.put_value(actor.inports['x'], 0)
+            else:
+                actor.inports["x"].connect(actors[j-1].outports["x"])
+            actors.append(actor)
+    scheduler.execute()
+
+    # How many threads were used
+    assert thread_count >= len(thread_ids)
+    assert 1 < len(thread_ids)
+    assert jobs_executed == branch_count * branch_length
+
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

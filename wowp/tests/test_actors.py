@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor, LoopWhile
+from wowp.actors import FuncActor, LoopWhile, ShellRunner
 import nose
 
 
@@ -51,6 +51,18 @@ def test_LoopWhileActorWithInner():
     lw.inports['loop_in'].put(0)
     result = lw.outports['final'].pop()
     assert(result == 10)
+
+def test_Shellrunner():
+    runner = ShellRunner("echo")
+    runner.inports['in'].put("test")
+
+    rvalue = runner.outports['return'].pop()
+    stdout = runner.outports['stdout'].pop()
+    stderr = runner.outports['stderr'].pop()
+
+    assert(rvalue == 0)
+    assert(stdout.strip() == "test")
+    assert(stderr.strip() == "")
 
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

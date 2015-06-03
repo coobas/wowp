@@ -82,4 +82,48 @@ class LoopWhile(Actor):
         else:
             # TODO use condition via ports
             raise NotImplementedError('To be implemented')
-        
+
+
+class ShellRunner(Actor):
+    """An actor executing external command."""
+    def __init__(self, base_command, name=None, binary=False):
+        super(ShellRunner, self).__init__(name=name)
+
+        if isinstance(base_command, str):
+            self.base_command = (base_command,)
+        else:
+            self.base_command = base_command
+
+        self.binary = binary
+        self.inports.append('in')
+        self.outports.append('stdout')
+        self.outports.append('stderr')
+        self.outports.append('return')
+
+    def on_input(self):
+        self.fire()
+
+    def fire(self):
+        import subprocess
+        import tempfile
+
+        vals = self.inports['in'].pop()
+        if isinstance(vals, str):
+            vals = (vals,)
+        args = self.base_command + vals
+
+        if self.binary:
+            mode = "w+b"
+        else:
+            mode = "w+t"
+
+        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
+            result = subprocess.call(args, stdout=fout, stderr=ferr)
+            fout.seek(0)
+            ferr.seek(0)
+
+            cout = fout.read()
+            cerr = ferr.read()
+        self.outports['return'].put(result)
+        self.outports['stdout'].put(cout)
+        self.outports['stderr'].put(cerr)

@@ -4,6 +4,21 @@ from . import logger
 from .schedulers import NaiveScheduler
 
 
+class NoValue(object):
+    """A unique no value object
+
+    Note that we cannot use None as this can be used by users
+    """
+    def __init__(self):
+        raise Exception('NoValue cannot be instantiated')
+
+
+def has_value(value):
+    """Returns True for any value except NoValue
+    """
+    return value is not NoValue
+
+
 class Component(object):
     """Base WOWP component class
     """
@@ -72,13 +87,12 @@ class Workflow(Composite):
 class Ports(object):
     """Port collection
     """
-    def __init__(self, port_class, owner, type=None):
+    def __init__(self, port_class, owner):
         # TODO port_class can differ for individual ports
         self._ports = ListDict()
         # port class is used to create new ports
         self._port_class = port_class
         self._owner = owner
-        self._type = type
 
     def __bool__(self):
         return bool(self._ports)
@@ -89,8 +103,8 @@ class Ports(object):
     def __iter__(self):
         return iter(self._ports.values())
 
-    def __new_port(self, name):
-        return self._port_class(name=name, owner=self._owner, type=self._type)
+    def __new_port(self, name, **kwargs):
+        return self._port_class(name=name, owner=self._owner, **kwargs)
 
     def __getitem__(self, item):
         """
@@ -112,20 +126,37 @@ class Ports(object):
     def insert_after(self, existing_port_name, new_port_name):
         self._ports.insert_after(existing_port_name, (new_port_name, self.__new_port(new_port_name)))
 
-    def append(self, new_port_name):
-        self._ports[new_port_name] = self.__new_port(new_port_name)
+    def append(self, new_port_name, **kwargs):
+        self._ports[new_port_name] = self.__new_port(new_port_name, **kwargs)
 
 
 class Port(object):
-    def __init__(self, name, owner, type=None):
+    """Represents a single input/output actor port
+    """
+
+    def __init__(self, name, owner, persistent=False, default=NoValue):
         self.name = name
         self.owner = owner
-        self.type = type
+        self.persistent = persistent
         self.buffer = deque()
+        self._default = default
         self._connections = []
+        self._last_value = NoValue
 
-    def __bool__(self):
-        return bool(self.buffer)
+    @property
+    def default(self):
+        if has_value(self._default):
+            return self._default
+        else:
+            raise AttributeError('No default value specified')
+
+    @default.setter
+    def default(self, value):
+        self._default = value
+
+    @default.deleter
+    def default(self):
+        self._default = NoValue
 
     @property
     def connections(self):
@@ -147,6 +178,14 @@ class Port(object):
         else:
             logger.warn('connecting an already connected actor {}'.format(other))
 
+    def __bool__(self):
+        """True if the port buffer is not empty
+        """
+        if self.buffer or has_value(self._default) or (self.persistent and has_value(self._last_value)):
+            return True
+        else:
+            return False
+
     def disconnect(self, other):
         if other not in self._connections:
             logger.warn('actor {} not currently connected'.format(other))
@@ -157,10 +196,25 @@ class Port(object):
     def pop(self):
         """Get single input
         """
-        return self.buffer.pop()
+        is_res = False
+        if self.buffer:
+            res = self.buffer.pop()
+            is_res = True
+            if self.persistent:
+                self._last_value = res
+        elif self.persistent and has_value(self._last_value):
+            res = self._last_value
+            is_res = True
+        elif has_value(self._default):
+            res = self._default
+            is_res = True
+        if is_res:
+            return res
+        else:
+            raise IndexError('Port buffer is empty')
 
     def pop_all(self):
-        """Get all inputs
+        """Get all values
         """
         values = self.buffer
         self.buffer = deque()
@@ -219,6 +273,8 @@ def valid_name(name):
         assert name[-1].isalnum() or name[-1] in ('_', )
     except AssertionError:
         return False
+    # TODO use isidentifier? + check for keywords via keyword.iskeyword()?
+    # return name.isidentifier()
     return True
 
 

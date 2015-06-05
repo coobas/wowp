@@ -128,3 +128,15 @@ class ShellRunner(Actor):
         self.outports['return'].put(result)
         self.outports['stdout'].put(cout)
         self.outports['stderr'].put(cerr)
+
+
+class Sink(Actor):
+    """Dumps everything
+    """
+
+    def on_input(self):
+        self.fire()
+
+    def fire(self):
+        for port in self.inports:
+             port.pop()

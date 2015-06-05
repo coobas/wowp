@@ -86,7 +86,7 @@ class LoopWhile(Actor):
 
 class ShellRunner(Actor):
     """An actor executing external command."""
-    def __init__(self, base_command, name=None, binary=False):
+    def __init__(self, base_command, name=None, binary=False, shell=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, str):
@@ -95,6 +95,7 @@ class ShellRunner(Actor):
             self.base_command = base_command
 
         self.binary = binary
+        self.shell = shell
         self.inports.append('in')
         self.outports.append('stdout')
         self.outports.append('stderr')
@@ -118,7 +119,7 @@ class ShellRunner(Actor):
             mode = "w+t"
 
         with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
-            result = subprocess.call(args, stdout=fout, stderr=ferr)
+            result = subprocess.call(args, stdout=fout, stderr=ferr, shell=self.shell)
             fout.seek(0)
             ferr.seek(0)
 

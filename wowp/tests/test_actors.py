@@ -53,7 +53,7 @@ def test_LoopWhileActorWithInner():
     assert(result == 10)
 
 def test_Shellrunner():
-    runner = ShellRunner("echo")
+    runner = ShellRunner("echo", shell=True)
     runner.inports['in'].put("test")
 
     rvalue = runner.outports['return'].pop()

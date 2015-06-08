@@ -4,3 +4,4 @@ syntax: glob
 .idea/*
 notebooks/.ipynb_checkpoints
 doc/_build
+notebooks/Tutorial/.ipynb_checkpoints

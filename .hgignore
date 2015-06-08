@@ -3,3 +3,4 @@ syntax: glob
 *.egg-info
 .idea/*
 notebooks/.ipynb_checkpoints
+doc/_build

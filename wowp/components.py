@@ -73,14 +73,20 @@ class Component(object):
 
 
 class Actor(Component):
+    """Actor class
+    """
     pass
 
 
 class Composite(Component):
+    """Composite = a group of actors
+    """
     pass
 
 
 class Workflow(Composite):
+    """Workflow class
+    """
     pass
 
 

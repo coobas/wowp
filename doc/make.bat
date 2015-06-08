@@ -46,6 +46,9 @@ if "%1" == "clean" (
 	goto end
 )
 
+REM run sphinx-apidoc
+del /q apidoc\*
+sphinx-apidoc.exe -o apidoc ..
 
 %SPHINXBUILD% 2> nul
 if errorlevel 9009 (

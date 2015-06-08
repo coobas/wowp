@@ -3,6 +3,12 @@ from collections import deque
 from . import logger
 from .schedulers import NaiveScheduler
 
+import networkx as nx
+import functools
+
+
+__all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
+
 
 class NoValue(object):
     """A unique no value object
@@ -70,6 +76,12 @@ class Component(object):
         """
         for port_name, value in kwargs.items():
             self.outports[port_name].put(value)
+            
+    @property
+    def graph(self):
+        """Construct NetworX call graph
+        """
+        return build_nx_graph(self)
 
 
 class Actor(Component):
@@ -263,7 +275,7 @@ class InPort(Port):
         self.buffer.appendleft(value)
         self.owner.on_input()
 
-
+        
 def valid_name(name):
     """Validate name (for actors, ports etc.)
     """
@@ -284,44 +296,84 @@ def valid_name(name):
     return True
 
 
-# class Composite(Component):
-#     """Composite class is used for workflows and composite actors"""
-#     def __init__(self, name=None):
-#         super(Composite, self).__init__(name=name)
-#
-#     def add(self, actor):
-#         self.components.append(actor)
-#
-#     def build_graph(self):
-#         self.graph = nx.DiGraph()
-#         for phase in (0, 1):
-#             for actor in self.components:
-#                 if phase == 0:
-#                     self.graph.add_node(actor.id, type='a')
-#                     for in_port in actor.input_ports():
-#                         port_node = '%s:%s' % (actor.id, in_port)
-#                         self.graph.add_node(port_node, type='i')
-#                         self.graph.add_edge(port_node, actor.id)
-#                         print('%s -> %s' % (port_node, actor.id))
-#                     for out_port in actor.output_ports():
-#                         port_node = '%s:%s' % (actor.id, out_port)
-#                         self.graph.add_node(port_node, type='o')
-#                         self.graph.add_edge(actor.id, port_node)
-#                         print('%s -> %s' % (actor.id, port_node))
-#                 if phase == 1:
-#                     for out_port, conns in actor.connections.iteritems():
-#                         source_node = '%s:%s' % (actor.id, out_port)
-#                         for conn in conns:
-#                             dest_node = '%s:%s' % (conn['actor'].id, conn['port'])
-#                             self.graph.add_edge(source_node, dest_node)
-#                             print('%s -> %s' % (source_node, dest_node))
-#
-#     def draw_graph(self):
-#         import matplotlib.pyplot as plt
-#         # pos = nx.graphviz_layout(self.graph, prog='dot')
-#         colors = {'a': 'r', 'i': 'g', 'o': 'y'}
-#         node_color = [colors[self.graph.node[n]['type']] for n in self.graph.nodes()]
-#         plt.figure()
-#         # nx.draw(self.graph, pos=pos, node_color=node_color)
-#         nx.draw(self.graph, node_color=node_color)
-#         plt.show()
+def build_nx_graph(actor):
+    """Create graph with all actors + ports as nodes.
+
+    It walks over all connections.
+
+    Prerequisities:
+    * networkx package
+    """
+    actors = []
+    edges = []
+    ports = []
+    graph = nx.DiGraph()
+
+
+    def _get_name(obj):
+        return str(hash(obj))
+
+    def _add_actor_node(actor):
+        attrs = {"fontsize" : "12", "color": "#0093d0"}
+        graph.add_node(_get_name(actor), label=actor.name, shape="box", **attrs)
+        actors.append(actor)
+
+    def _walk_node(actor):
+        name = _get_name(actor)
+        if not actor in actors:
+            _add_actor_node(actor)
+        for port in actor.outports:
+            if port not in ports:
+                attrs = {}
+                if not port.connections:
+                    # terminal node
+                    attrs["style"]="filled"
+                    attrs["color"]="#ef4135"
+                else:
+                    attrs["color"] = "#ffe28a"
+                graph.add_node(_get_name(port), label=port.name, **attrs)
+                graph.add_edge(name, _get_name(port))
+            for other in port.connections:
+                if (port, other) not in edges:
+                    edges.append((port, other))
+                    _walk_node(other.owner)
+                    graph.add_edge(_get_name(port), _get_name(other))
+        for port in actor.inports:
+            if port not in ports:
+                attrs = {}
+                if not port.connections:
+                    # terminal node
+                    attrs["style"]="filled"
+                    attrs["color"]="#ffffff"
+                else:
+                    attrs["color"] = "#9ed8f5"
+                graph.add_node(_get_name(port), label=port.name, **attrs)
+                graph.add_edge(_get_name(port), name, )
+                ports.append(port)
+            for other in port.connections:
+                if (other, port) not in edges:
+                    _walk_node(other.owner)
+
+    _walk_node(actor)
+    return graph
+
+
+def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
+               pos_kwargs=None, draw_kwargs=None):
+    """Draw a workflow graph using NetworkX
+    """
+    kwargs = {}
+    if pos_kwargs is not None:
+        kwargs.update(pos_kwargs)
+    if layout=='spectral':
+        lfunc = functools.partial(nx.spectral_layout, **kwargs)
+    else:
+        raise ValueError('{} layout not supported'.format(layout))
+    # get colors and labels
+    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()]
+    shapes = [graph.node[n].get('shape', 'o') for n in graph.nodes_iter()]
+    labels = {n: graph.node[n].get('label', '') for n in graph.nodes_iter()}
+    pos = lfunc(graph)
+    nx.draw_networkx(graph, pos=pos, with_labels=with_labels, labels=labels,
+                     node_color=colors, node_size=node_size)
+

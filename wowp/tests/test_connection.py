@@ -24,18 +24,18 @@ def test_persistent_port():
     actor.inports.append('in_port', persistent=True)
     assert actor.inports['in_port'].persistent
     # the port should be empty now
-    assert not actor.inports['in_port']
+    assert actor.inports['in_port'].isempty()
     value = randint(-100, 100)
     actor.inports.in_port.put(value)
     assert actor.inports.in_port.pop() == value
     # the value should still be there
     assert actor.inports.in_port.pop() == value
     # and this should evaluate to True
-    assert actor.inports['in_port']
+    assert not actor.inports['in_port'].isempty()
     # try to switch off the persistence
     actor.inports['in_port'].persistent = False
     assert_raises(IndexError, actor.inports.in_port.pop)
-    assert not actor.inports['in_port']
+    assert actor.inports['in_port'].isempty()
 
 
 def test_default_value_port():

@@ -25,7 +25,7 @@ class FuncActor(Actor):
 
     def on_input(self):
         # print('on_input')
-        if all(port for port in self.inports):
+        if all(not port.isempty() for port in self.inports):
             self.fire()
 
     def fire(self):

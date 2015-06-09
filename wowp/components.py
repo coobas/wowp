@@ -1,4 +1,4 @@
-from .util import ListDict
+from .util import ListDict, deprecated
 from collections import deque
 from . import logger
 from .schedulers import NaiveScheduler
@@ -112,7 +112,7 @@ class Ports(object):
         self._port_class = port_class
         self._owner = owner
 
-    def __bool__(self):
+    def isempty(self):
         return bool(self._ports)
 
     def __len__(self):
@@ -196,13 +196,19 @@ class Port(object):
         else:
             logger.warn('connecting an already connected actor {}'.format(other))
 
+    @deprecated
     def __bool__(self):
         """True if the port buffer is not empty
         """
+        return not self.isempty()
+    
+    def isempty(self):
+        """True if the port buffer is empty
+        """
         if self.buffer or has_value(self._default) or (self.persistent and has_value(self._last_value)):
-            return True
-        else:
             return False
+        else:
+            return True
 
     def disconnect(self, other):
         if other not in self._connections:
@@ -214,19 +220,20 @@ class Port(object):
     def pop(self):
         """Get single input
         """
-        is_res = False
+        res = NoValue
         if self.buffer:
+            # input item is in the buffer
             res = self.buffer.pop()
-            is_res = True
             if self.persistent:
                 self._last_value = res
         elif self.persistent and has_value(self._last_value):
+            # persistent port, last value exists
             res = self._last_value
-            is_res = True
         elif has_value(self._default):
+            # port with default value
             res = self._default
-            is_res = True
-        if is_res:
+        # chack whether any result value is available
+        if has_value(res):
             return res
         else:
             raise IndexError('Port buffer is empty')

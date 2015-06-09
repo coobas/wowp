@@ -98,5 +98,45 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
     assert 1 < len(thread_ids)
     assert jobs_executed == branch_count * branch_length
 
+
+def test_ThreadedScheduler_linearity():
+    import random
+    from time import sleep
+
+    max_ = 100
+
+    original_sequence = list(range(max_))
+    new_sequence = []
+
+    thread_count = 2
+    scheduler = ThreadedScheduler(max_threads=thread_count)
+    n = 0
+
+    def orig(x) -> ('x'):
+        return x
+
+    def app_fn(x) -> ('x'):
+        s = random.randint(1, 30) / 1000.0
+        sleep(s)
+        return x
+
+    orig_actor = FuncActor(orig)
+    orig_actor.scheduler = scheduler
+    new_actor = FuncActor(app_fn)
+    orig_actor.outports["x"].connect(new_actor.inports["x"])
+
+    for i in range(max_):
+        orig_actor.inports["x"].put(i)
+
+    scheduler.execute()
+    new_sequence = list(new_actor.outports['x'].pop_all())
+
+    print("Received: ", list(reversed(new_sequence)))
+    print("Expected: ", original_sequence)
+
+    assert list(reversed(new_sequence)) == original_sequence
+
+
+
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

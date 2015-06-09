@@ -14,6 +14,15 @@ Our goal
 Flow based programming via actors and workflows.
 
 
+Tutorials
+=========
+
+.. toctree::
+   :maxdepth: 2
+
+   Tutorial/basics
+   Tutorial/graph_drawing
+
 
 Reference
 =========

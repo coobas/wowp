@@ -147,6 +147,9 @@ class Ports(object):
     def append(self, new_port_name, **kwargs):
         self._ports[new_port_name] = self.__new_port(new_port_name, **kwargs)
 
+    def keys(self):
+        return list(self._ports.keys())
+
 
 class Port(object):
     """Represents a single input/output actor port
@@ -201,7 +204,7 @@ class Port(object):
         """True if the port buffer is not empty
         """
         return not self.isempty()
-    
+
     def isempty(self):
         """True if the port buffer is empty
         """

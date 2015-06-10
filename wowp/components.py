@@ -1,10 +1,12 @@
 from .util import ListDict, deprecated
 from collections import deque
 from . import logger
-from .schedulers import NaiveScheduler
+from .schedulers import NaiveScheduler, LinearizedScheduler
 
 import networkx as nx
 import functools
+import keyword
+import warnings
 
 
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
@@ -47,6 +49,24 @@ class Component(object):
         """
         raise NotImplementedError('Calling a virtual method')
 
+    def run(self):
+        """
+        Run the actor
+        """
+        # first get the result of the fire method
+        res = self.fire()
+        if res is None:
+            res = {}
+        # put values to output ports
+        out_names = self.outports.keys()
+        if not hasattr(res, 'items'):
+            raise ValueError('The fire method must return a dict-like object with items method')
+        for name, value in res.items():
+            if name in out_names:
+                self.outports[name].put(value)
+            else:
+                raise ValueError("{} not in output ports".format(name))
+
     @property
     def inports(self):
         return self._inports
@@ -84,17 +104,65 @@ class Component(object):
         return build_nx_graph(self)
 
 
+# TODO create workflow (composite) from actor's connections
+    def get_workflow(self):
+        '''Creates a workflow form actor's connections
+        '''
+        raise NotImplementedError('TBI')
+
+
 class Actor(Component):
     """Actor class
     """
-    pass
+    def __call__(self, **kwargs):
+        """
+        Run the component with input ports filled from keyword arguments.
+
+        :param kwargs: input ports values
+        :return: output port(s) value(s)
+        :rtype: dict for multiple ports
+        """
+
+        for inport in self.inports:
+            if inport.name in kwargs:
+                inport.buffer.appendleft(kwargs[inport.name])
+        # run the actor
+        res = self.fire()
+        return res
 
 
 class Composite(Component):
     """Composite = a group of actors
     """
-    pass
+    def __call__(self, scheduler_=None, **kwargs):
+        """
+        Run the component with input ports filled from keyword arguments.
 
+        :param scheduler_: execution scheduler (defaul
+        :param kwargs: input ports values
+        :return: output port(s) value(s)
+        :rtype: dict for multiple ports
+        """
+
+        if scheduler_ is None:
+            scheduler_ = LinearizedScheduler()
+        # TODO
+        for inport in self.inports:
+            if inport.name in kwargs:
+                inport.buffer.appendleft(kwargs[inport.name])
+        # run the actor
+        # vnutit scheduler
+        # zavolat pro vsechny on_input
+        res = self.run()
+        # TODO return res
+
+    def on_input(self):
+        # TODO should work as an actor
+        pass
+
+    def fire(self):
+        # TODO
+        pass
 
 class Workflow(Composite):
     """Workflow class
@@ -289,21 +357,10 @@ class InPort(Port):
 def valid_name(name):
     """Validate name (for actors, ports etc.)
     """
-    try:
-        # name must be a string
-        assert isinstance(name, str)
-        # non-empty
-        assert name
-        # first is an alpha char
-        assert name[0].isalpha()
-        # only alphanumeric chars or _ or space
-        assert all((ch.isalnum() or ch in ('_', ' ') for ch in name[1:-1]))
-        assert name[-1].isalnum() or name[-1] in ('_', )
-    except AssertionError:
+    if name.isidentifier() and not keyword.iskeyword(name):
+        return True
+    else:
         return False
-    # TODO use isidentifier? + check for keywords via keyword.iskeyword()?
-    # return name.isidentifier()
-    return True
 
 
 def build_nx_graph(actor):

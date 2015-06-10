@@ -26,7 +26,7 @@ class FuncActor(Actor):
     def on_input(self):
         # print('on_input')
         if all(not port.isempty() for port in self.inports):
-            self.fire()
+            self.run()
 
     def fire(self):
         # print('fire')
@@ -36,8 +36,10 @@ class FuncActor(Actor):
         if len(self.outports) == 1:
             func_res = (func_res,)
         # iterate over ports and return values
-        for out_port, value in zip(self.outports, func_res):
-            out_port.put(value)
+        res = {}
+        for name, value in zip(self.outports.keys(), func_res):
+            res[name] = value
+        return res
         
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -70,18 +72,20 @@ class LoopWhile(Actor):
     def on_input(self):
         # an input arrived --> fire
         # the condition is evaluated in fire
-        self.fire()
+        self.run()
 
     def fire(self):
         input_val = self.inports['loop_in'].pop()
+        res = {}
         if self.condition_func:
             if self.condition_func(input_val):
-                self.outports['loop_out'].put(input_val)
+                res['loop_out'] = input_val
             else:
-                self.outports['final'].put(input_val)
+                res['final'] = input_val
         else:
             # TODO use condition via ports
             raise NotImplementedError('To be implemented')
+        return res
 
 
 class ShellRunner(Actor):
@@ -102,7 +106,7 @@ class ShellRunner(Actor):
         self.outports.append('return')
 
     def on_input(self):
-        self.fire()
+        self.run()
 
     def fire(self):
         import subprocess
@@ -125,9 +129,12 @@ class ShellRunner(Actor):
 
             cout = fout.read()
             cerr = ferr.read()
-        self.outports['return'].put(result)
-        self.outports['stdout'].put(cout)
-        self.outports['stderr'].put(cerr)
+        res = {
+            'return': result,
+            'stdout': cout,
+            'stderr': cerr
+        }
+        return res
 
 
 class Sink(Actor):
@@ -135,7 +142,7 @@ class Sink(Actor):
     """
 
     def on_input(self):
-        self.fire()
+        self.run()
 
     def fire(self):
         for port in self.inports:

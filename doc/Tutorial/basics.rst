@@ -71,6 +71,11 @@ Simple workflows
 2. Ports get connected using the **``+=``** operator
    (``inport += outport``).
 
+\*Better workflow creation will be implemented soon.
+``Actor.get_workflow`` will create a workflow *automagically*. It will
+also be possible to create wokflows *explicitely*, e.g. in cases when
+``get_workflow`` cannot be used.\*
+
 Two actors chained together
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -112,6 +117,13 @@ Creating a custom actor
 
     from wowp import Actor
 
+Every actor must implement ``on_input`` and ``fire`` methods. \*
+``on_input`` is called whenever a new input arrives (on any port). \*
+``on_input`` must invoke ``self.run()`` when the actor is ready to run.
+\* The ``fire`` method gets inputs from input ports using ``pop``. \*
+The result of ``fire`` must be a ``dict`` (like) object, whose keys are
+output port names.
+
 .. code:: python
 
     class StrActor(Actor):
@@ -122,10 +134,14 @@ Creating a custom actor
             # and output ports
             self.outports.append('output')
         def on_input(self):
-            # call fire if any input is available
-            self.fire()
+            # call run if any input is available
+            self.run()
         def fire(self):
-            self.outports['output'].put(str(self.inports['input'].pop()))
+            # get input value(s) using .pop()
+            value = self.inports['input'].pop()
+            # return a dictionary with port names as keys
+            res = {'output': str(value)}
+            return res
 
 .. code:: python
 
@@ -133,18 +149,14 @@ Creating a custom actor
 
 .. code:: python
 
-    actor.inports['input'].put(123)
-
-.. code:: python
-
-    actor.outports['output'].pop()
-
-
+    # we can call the actor directly -- see what's output
+    value = 123
+    print(actor(input=value))
+    # and check that the output is as expected
+    assert actor(input=value)['output'] == str(value)
 
 
 .. parsed-literal::
 
-    '123'
-
-
-
+    {'output': '123'}
+    

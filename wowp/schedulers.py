@@ -1,62 +1,144 @@
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import random
+import threading
 
 
-class NaiveScheduler(object):
+class _ActorRunner(object):
+    def on_outport_put_value(self, outport):
+        if outport.connections:
+            value = outport.pop()
+            for inport in outport.connections:
+                self.put_value(inport, value)
+
+    def run_actor(self, actor):
+        # print("Run actor")
+        result = actor.fire()
+        # print("Result: ", result)
+        if not result:
+            return
+        else:
+            out_names = actor.outports.keys()
+            if not hasattr(result, 'items'):
+                raise ValueError('The fire method must return a dict-like object with items method')
+            for name, value in result.items():
+                if name in out_names:
+                    outport = actor.outports[name]
+                    outport.put(value)
+                    self.on_outport_put_value(outport)
+                else:
+                    raise ValueError("{} not in output ports".format(name))
+
+class NaiveScheduler(_ActorRunner):
     """Scheduler that directly calls connected actors.
 
     Problem: recursion quickly ends in full call stack.
     """
     def put_value(self, in_port, value):
-        in_port.put(value)
+        should_run = in_port.put(value)
+        if should_run:
+            self.run_actor(in_port.owner)
 
 
-class LinearizedScheduler(object):
+class LinearizedScheduler(_ActorRunner):
     """Scheduler that stacks all inputs in a queue and executes them in FIFO order."""
     def __init__(self):
         self.execution_queue = deque()
 
     def put_value(self, in_port, value):
-        in_port.owner.scheduler = self
         self.execution_queue.appendleft((in_port, value))
 
     def execute(self):
         while self.execution_queue:
             in_port, value = self.execution_queue.pop()
-            in_port.put(value)
+            should_run = in_port.put(value)
+            if should_run:
+                self.run_actor(in_port.owner)
 
 
-class RandomScheduler(LinearizedScheduler):
-    """Scheduler that queues inputs but inserts them in random order."""
-    def execute(self):
-        while self.execution_queue:
-            self.execution_queue.rotate(random.randint(0, len(self.execution_queue)))
-            in_port, value = self.execution_queue.pop()
-            in_port.put(value)
+class SchedulerWorker(threading.Thread, _ActorRunner):
+    def __init__(self, scheduler, inner_id):
+        threading.Thread.__init__(self)
+        self.scheduler = scheduler
+        self.executing = False
+        self.finished = False
+        self.inner_id = inner_id
+        self.state_mutex = threading.RLock()
 
-
-class _ConcurrentScheduler(object):
-    def __init__(self, executor_class, max_threads=4):
-        self.executor = executor_class(max_workers=max_threads)
-        self.running = False
-        self.begin_queue = deque()
+    def run(self):
+        from time import sleep
+        while not self.finished:
+            pv = self.scheduler.pop_idle_task()
+            if pv:
+                port, value = pv
+                should_run = port.put(value)         #  Change to if
+                if should_run:
+                    # print(self.inner_id, port.owner.name, value)
+                    self.run_actor(port.owner)
+                else:
+                    pass
+                    # print(self.inner_id, "Won't run", )
+                self.scheduler.on_actor_finished(port.owner)
+            else:
+                pass
+                # print(self.inner_id, "Nothing to do")
+                sleep(0.02)
+        print(self.inner_id, "End")
 
     def put_value(self, in_port, value):
-        if self.running:
-            self.executor.submit(in_port.put, value)
-        else:
-            self.begin_queue.appendleft((in_port, value))
+        # print(self.inner_id, " worker put ", value)
+        self.scheduler.put_value(in_port, value)
+
+    def finish(self):
+        with self.state_mutex:
+            self.finished = True
+
+
+class ThreadedScheduler(object):
+    def __init__(self, max_threads=2):
+        self.max_threads = max_threads
+        self.threads = []
+        self.queue = deque()
+        self.running_actors = []
+        self.state_mutex = threading.RLock()
+
+    def pop_idle_task(self):
+        with self.state_mutex:
+            for port, value in self.queue:
+                if port.owner not in self.running_actors:
+                    # print("Removing", value)
+                    self.queue.remove((port, value))   # Removes first occurrence - it's probably safe
+                    self.running_actors.append(port.owner)
+                    return port, value
+            else:
+                return None
+
+    def put_value(self, in_port, value):
+        with self.state_mutex:     # Probably not necessary
+            # print("put ", value, ", in queue: ", len(self.queue))
+            self.queue.append((in_port, value))
+
+    def is_running(self):
+        with self.state_mutex:
+            return bool(self.running_actors or self.queue)
+
+    def on_actor_finished(self, actor):
+        with self.state_mutex:
+            self.running_actors.remove(actor)
+            if not self.is_running():
+                self.finish_all_threads()
 
     def execute(self):
-        self.running = True
-        with self.executor:
-            while len(self.begin_queue):
-                in_port, value = self.begin_queue.pop()
-                self.put_value(in_port, value)
-        self.running = False
+        with self.state_mutex:     # Probably not necessary
+            for i in range(self.max_threads):
+                thread = SchedulerWorker(self, i)
+                self.threads.append(thread)
+                thread.start()
+                # print("Thread started", thread.ident)
+        for thread in self.threads:
+            print("Join thread")
+            thread.join()
 
-class ThreadedScheduler(_ConcurrentScheduler):
-    """Scheduler that uses thread pool from concurrent.futures module."""
-    def __init__(self,  max_threads=4):
-        super(ThreadedScheduler, self).__init__(ThreadPoolExecutor, max_threads=max_threads)
+    def finish_all_threads(self):
+        print("Everything finished. Waiting for threads to end.")
+        for thread in self.threads:
+            thread.finish()
+

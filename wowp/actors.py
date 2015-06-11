@@ -23,11 +23,6 @@ class FuncActor(Actor):
         for name in outports:
             self.outports.append(name)
 
-    def on_input(self):
-        # print('on_input')
-        if all(not port.isempty() for port in self.inports):
-            self.run()
-
     def fire(self):
         # print('fire')
         args = (port.pop() for port in self.inports)
@@ -69,11 +64,6 @@ class LoopWhile(Actor):
             self.outports['loop_out'].connect(list(inner_actor.inports._ports.values())[0])
             self.inports['loop_in'].connect(list(inner_actor.outports._ports.values())[0])
 
-    def on_input(self):
-        # an input arrived --> fire
-        # the condition is evaluated in fire
-        self.run()
-
     def fire(self):
         input_val = self.inports['loop_in'].pop()
         res = {}
@@ -105,9 +95,6 @@ class ShellRunner(Actor):
         self.outports.append('stderr')
         self.outports.append('return')
 
-    def on_input(self):
-        self.run()
-
     def fire(self):
         import subprocess
         import tempfile
@@ -116,6 +103,7 @@ class ShellRunner(Actor):
         if isinstance(vals, str):
             vals = (vals,)
         args = self.base_command + vals
+        print(args)
 
         if self.binary:
             mode = "w+b"
@@ -142,7 +130,7 @@ class Sink(Actor):
     """
 
     def on_input(self):
-        self.run()
+        return True
 
     def fire(self):
         for port in self.inports:

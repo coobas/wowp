@@ -1,5 +1,5 @@
 from wowp.actors import FuncActor, LoopWhile
-from wowp.schedulers import LinearizedScheduler, RandomScheduler, ThreadedScheduler
+from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
 
 import nose
 
@@ -24,6 +24,7 @@ def test_LinearizedScheduler_loop1000():
 def _run_tree_512_test(scheduler):
     def sum(a, b) -> ('a'):
         return a + b
+
     def ident(a) -> ('a'):
         return a
 
@@ -50,10 +51,6 @@ def _run_tree_512_test(scheduler):
     scheduler.execute()
 
     assert(2 ** power == last.outports['a'].pop())
-
-def test_RandomScheduler_tree512():
-    scheduler = RandomScheduler()
-    _run_tree_512_test(scheduler)
 
 def test_ThreadedScheduler_tree512():
     scheduler = ThreadedScheduler(max_threads=8)
@@ -100,22 +97,26 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
 
 
 def test_ThreadedScheduler_linearity():
+    thread_count = 4
+    scheduler = ThreadedScheduler(max_threads=thread_count)
+    _run_linearity_test(scheduler)
+
+
+def _run_linearity_test(scheduler):
     import random
     from time import sleep
 
     max_ = 100
 
     original_sequence = list(range(max_))
-    new_sequence = []
-
-    thread_count = 2
-    scheduler = ThreadedScheduler(max_threads=thread_count)
     n = 0
 
     def orig(x) -> ('x'):
+        # print("In act1:", x)
         return x
 
     def app_fn(x) -> ('x'):
+        # print("In act2:", x)
         s = random.randint(1, 30) / 1000.0
         sleep(s)
         return x
@@ -126,7 +127,7 @@ def test_ThreadedScheduler_linearity():
     orig_actor.outports["x"].connect(new_actor.inports["x"])
 
     for i in range(max_):
-        orig_actor.inports["x"].put(i)
+        scheduler.put_value(orig_actor.inports["x"], i)
 
     scheduler.execute()
     new_sequence = list(new_actor.outports['x'].pop_all())

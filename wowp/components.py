@@ -130,6 +130,10 @@ class Actor(Component):
         res = self.fire()
         return res
 
+    def on_input(self):
+        # print("on_input", all(not port.isempty() for port in self.inports))
+        return all(not port.isempty() for port in self.inports)
+
 
 class Composite(Component):
     """Composite = a group of actors
@@ -325,12 +329,7 @@ class OutPort(Port):
 
         Value is sent to connected ports (or stored if not connected)
         """
-        for conn in self._connections:
-            # output to all connected ports
-            self.owner.scheduler.put_value(conn, value)
-        else:
-            # store is nothing is connected
-            self.buffer.appendleft(value)
+        self.buffer.appendleft(value)
 
 
 class InPort(Port):
@@ -349,9 +348,12 @@ class InPort(Port):
 
     def put(self, value):
         """Put single input
+
+        :rtype: bool
+        :return: Whether the actor is ready to perform
         """
         self.buffer.appendleft(value)
-        self.owner.on_input()
+        return self.owner.on_input()
 
         
 def valid_name(name):

@@ -135,7 +135,7 @@ class Sink(Actor):
     """Dumps everything
     """
 
-    def on_input(self):
+    def can_run(self):
         return True
 
     def fire(self):

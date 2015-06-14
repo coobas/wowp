@@ -46,7 +46,7 @@ class Component(object):
         """
         raise NotImplementedError('Calling a virtual method')
 
-    def on_input(self):
+    def can_run(self):
         # print("on_input", all(not port.isempty() for port in self.inports))
         return all(not port.isempty() for port in self.inports)
 
@@ -360,7 +360,7 @@ class InPort(Port):
         :return: Whether the actor is ready to perform
         """
         self.buffer.appendleft(value)
-        return self.owner.on_input()
+        return self.owner.can_run()
 
 
 def valid_name(name):

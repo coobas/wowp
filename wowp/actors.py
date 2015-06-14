@@ -1,11 +1,13 @@
 from .components import Actor
 import inspect
-from . import logger
+
 
 class FuncActor(Actor):
+
     """Actor defined simply by a function
     """
     # TODO create a derived class instead of an instance
+
     def __init__(self, func, outports='out'):
         super(FuncActor, self).__init__(name=func.__name__)
         # get function signature
@@ -27,7 +29,7 @@ class FuncActor(Actor):
         # print('fire')
         args = (port.pop() for port in self.inports)
         func_res = self.func(*args)
-        
+
         if len(self.outports) == 1:
             func_res = (func_res,)
         # iterate over ports and return values
@@ -35,12 +37,13 @@ class FuncActor(Actor):
         for name, value in zip(self.outports.keys(), func_res):
             res[name] = value
         return res
-        
+
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
 
 
 class LoopWhile(Actor):
+
     """While loop actor
     """
 
@@ -79,7 +82,9 @@ class LoopWhile(Actor):
 
 
 class ShellRunner(Actor):
+
     """An actor executing external command."""
+
     def __init__(self, base_command, name=None, binary=False, shell=False):
         super(ShellRunner, self).__init__(name=name)
 
@@ -126,6 +131,7 @@ class ShellRunner(Actor):
 
 
 class Sink(Actor):
+
     """Dumps everything
     """
 
@@ -134,4 +140,4 @@ class Sink(Actor):
 
     def fire(self):
         for port in self.inports:
-             port.pop()
+            port.pop()

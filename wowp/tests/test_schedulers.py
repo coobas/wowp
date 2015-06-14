@@ -6,7 +6,10 @@ import nose
 
 def test_LinearizedScheduler_loop1000():
     scheduler = LinearizedScheduler()
-    condition = lambda x: x < 1000
+
+    def condition(x):
+        return x < 1000
+
     def func(x) -> ('x'):
         return x + 1
     fa = FuncActor(func)
@@ -20,6 +23,7 @@ def test_LinearizedScheduler_loop1000():
 
     result = lw.outports['final'].pop()
     assert(result == 1000)
+
 
 def _run_tree_512_test(scheduler):
     def sum(a, b) -> ('a'):
@@ -52,13 +56,16 @@ def _run_tree_512_test(scheduler):
 
     assert(2 ** power == last.outports['a'].pop())
 
+
 def test_ThreadedScheduler_tree512():
     scheduler = ThreadedScheduler(max_threads=8)
     _run_tree_512_test(scheduler)
 
+
 def test_LinearizedScheduler_tree512():
     scheduler = LinearizedScheduler()
     _run_tree_512_test(scheduler)
+
 
 def test_ThrededScheduler_creates_threads_and_executes_all():
     """Test whether more threads are being used by the scheduler"""
@@ -86,7 +93,7 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
             if j == 0:
                 scheduler.put_value(actor.inports['x'], 0)
             else:
-                actor.inports["x"].connect(actors[j-1].outports["x"])
+                actor.inports["x"].connect(actors[j - 1].outports["x"])
             actors.append(actor)
     scheduler.execute()
 
@@ -109,7 +116,6 @@ def _run_linearity_test(scheduler):
     max_ = 100
 
     original_sequence = list(range(max_))
-    n = 0
 
     def orig(x) -> ('x'):
         # print("In act1:", x)
@@ -136,7 +142,6 @@ def _run_linearity_test(scheduler):
     print("Expected: ", original_sequence)
 
     assert list(reversed(new_sequence)) == original_sequence
-
 
 
 if __name__ == '__main__':

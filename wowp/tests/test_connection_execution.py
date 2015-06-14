@@ -80,7 +80,7 @@ def test_three_in_line():
     actor1.inports['x'].put(in_value)
 
     NaiveScheduler().run_actor(actor1)
-    
+
     assert (func(func(func(in_value)))) == actor3.outports['x'].pop()
 
 

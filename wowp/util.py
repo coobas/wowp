@@ -9,10 +9,12 @@ except ImportError:
 
 
 class ListDict(_OrderedDict):
+
     """Ordered dict with insert methods
 
     From https://gist.github.com/jaredks/6276032
     """
+
     def __init__(self, *args, **kwds):
         try:
             self.__insertions_running
@@ -50,9 +52,10 @@ def deprecated(func):
     when the function is used."""
 
     def new_func(*args, **kwargs):
-        warnings.simplefilter('always', DeprecationWarning) #turn off filter
-        warnings.warn("Call to deprecated function {}.".format(func.__name__), category=DeprecationWarning, stacklevel=2)
-        warnings.simplefilter('default', DeprecationWarning) #reset filter
+        warnings.simplefilter('always', DeprecationWarning)  # turn off filter
+        warnings.warn("Call to deprecated function {}.".format(func.__name__),
+                      category=DeprecationWarning, stacklevel=2)
+        warnings.simplefilter('default', DeprecationWarning)  # reset filter
         return func(*args, **kwargs)
 
     new_func.__name__ = func.__name__

@@ -5,7 +5,7 @@ import nose
 
 def test_FuncActor_return_annotation():
     def func(x, y) -> ('a', 'b'):
-        return x+1, y+2
+        return x + 1, y + 2
     x, y = 2, 3.1
 
     fa = FuncActor(func)
@@ -22,15 +22,18 @@ def test_FuncActor_return_annotation():
 
 def test_FuncActor_call():
     def func(x, y) -> ('a', 'b'):
-        return x+1, y+2
+        return x + 1, y + 2
     x, y = 2, 3.1
 
     fa = FuncActor(func)
 
     assert func(x, y) == fa(x, y)
 
+
 def test_LoopWhileActor():
-    condition = lambda x: x < 10
+    def condition(x):
+        return x < 10
+
     def func(x) -> ('x'):
         return x + 1
     fa = FuncActor(func)
@@ -47,10 +50,13 @@ def test_LoopWhileActor():
 
     assert(result == 10)
 
+
 def test_LoopWhileActorWithInner():
-    condition = lambda x: x < 10
+    def condition(x):
+        return x < 10
+
     def func(x) -> ('x'):
-        return x + 1    
+        return x + 1
     fa = FuncActor(func)
     lw = LoopWhile("a_loop", condition, inner_actor=fa)
 
@@ -60,8 +66,13 @@ def test_LoopWhileActorWithInner():
     result = lw.outports['final'].pop()
     assert(result == 10)
 
+
 def test_Shellrunner():
-    runner = ShellRunner("/usr/bin/echo", shell=True)
+    import platform
+    if platform.system() == 'Windows':
+        runner = ShellRunner("echo", shell=True)
+    else:
+        runner = ShellRunner("echo", shell=False)
     runner.inports['in'].put("test")
 
     NaiveScheduler().run_actor(runner)

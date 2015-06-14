@@ -6,17 +6,18 @@ from .schedulers import NaiveScheduler, LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
-import warnings
 
 
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
 
 
 class NoValue(object):
+
     """A unique no value object
 
     Note that we cannot use None as this can be used by users
     """
+
     def __init__(self):
         raise Exception('NoValue cannot be instantiated')
 
@@ -28,6 +29,7 @@ def has_value(value):
 
 
 class Component(object):
+
     """Base WOWP component class
     """
 
@@ -96,7 +98,7 @@ class Component(object):
         """
         for port_name, value in kwargs.items():
             self.outports[port_name].put(value)
-            
+
     @property
     def graph(self):
         """Construct NetworX call graph
@@ -112,8 +114,10 @@ class Component(object):
 
 
 class Actor(Component):
+
     """Actor class
     """
+
     def __call__(self, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
@@ -136,8 +140,10 @@ class Actor(Component):
 
 
 class Composite(Component):
+
     """Composite = a group of actors
     """
+
     def __call__(self, scheduler_=None, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
@@ -168,15 +174,19 @@ class Composite(Component):
         # TODO
         pass
 
+
 class Workflow(Composite):
+
     """Workflow class
     """
     pass
 
 
 class Ports(object):
+
     """Port collection
     """
+
     def __init__(self, port_class, owner):
         # TODO port_class can differ for individual ports
         self._ports = ListDict()
@@ -214,7 +224,8 @@ class Ports(object):
         self._ports[key] = value
 
     def insert_after(self, existing_port_name, new_port_name):
-        self._ports.insert_after(existing_port_name, (new_port_name, self.__new_port(new_port_name)))
+        self._ports.insert_after(existing_port_name,
+                                 (new_port_name, self.__new_port(new_port_name)))
 
     def append(self, new_port_name, **kwargs):
         self._ports[new_port_name] = self.__new_port(new_port_name, **kwargs)
@@ -224,6 +235,7 @@ class Ports(object):
 
 
 class Port(object):
+
     """Represents a single input/output actor port
     """
 
@@ -322,8 +334,10 @@ class Port(object):
 
 
 class OutPort(Port):
+
     """A single, named output port
     """
+
     def put(self, value):
         """Put output value
 
@@ -333,6 +347,7 @@ class OutPort(Port):
 
 
 class InPort(Port):
+
     """A single, named input port
     """
 
@@ -355,7 +370,7 @@ class InPort(Port):
         self.buffer.appendleft(value)
         return self.owner.on_input()
 
-        
+
 def valid_name(name):
     """Validate name (for actors, ports etc.)
     """
@@ -378,26 +393,25 @@ def build_nx_graph(actor):
     ports = []
     graph = nx.DiGraph()
 
-
     def _get_name(obj):
         return str(hash(obj))
 
     def _add_actor_node(actor):
-        attrs = {"fontsize" : "12", "color": "#0093d0"}
+        attrs = {"fontsize": "12", "color": "#0093d0"}
         graph.add_node(_get_name(actor), label=actor.name, shape="box", **attrs)
         actors.append(actor)
 
     def _walk_node(actor):
         name = _get_name(actor)
-        if not actor in actors:
+        if actor not in actors:
             _add_actor_node(actor)
         for port in actor.outports:
             if port not in ports:
                 attrs = {}
                 if not port.connections:
                     # terminal node
-                    attrs["style"]="filled"
-                    attrs["color"]="#ef4135"
+                    attrs["style"] = "filled"
+                    attrs["color"] = "#ef4135"
                 else:
                     attrs["color"] = "#ffe28a"
                 graph.add_node(_get_name(port), label=port.name, **attrs)
@@ -412,8 +426,8 @@ def build_nx_graph(actor):
                 attrs = {}
                 if not port.connections:
                     # terminal node
-                    attrs["style"]="filled"
-                    attrs["color"]="#ffffff"
+                    attrs["style"] = "filled"
+                    attrs["color"] = "#ffffff"
                 else:
                     attrs["color"] = "#9ed8f5"
                 graph.add_node(_get_name(port), label=port.name, **attrs)
@@ -434,7 +448,7 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
     kwargs = {}
     if pos_kwargs is not None:
         kwargs.update(pos_kwargs)
-    if layout=='spectral':
+    if layout == 'spectral':
         lfunc = functools.partial(nx.spectral_layout, **kwargs)
     else:
         raise ValueError('{} layout not supported'.format(layout))
@@ -445,4 +459,3 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
     pos = lfunc(graph)
     nx.draw_networkx(graph, pos=pos, with_labels=with_labels, labels=labels,
                      node_color=colors, node_size=node_size)
-

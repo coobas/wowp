@@ -3,6 +3,7 @@ import threading
 
 
 class _ActorRunner(object):
+
     def on_outport_put_value(self, outport):
         if outport.connections:
             value = outport.pop()
@@ -18,7 +19,8 @@ class _ActorRunner(object):
         else:
             out_names = actor.outports.keys()
             if not hasattr(result, 'items'):
-                raise ValueError('The fire method must return a dict-like object with items method')
+                raise ValueError('The fire method must return '
+                                 'a dict-like object with items method')
             for name, value in result.items():
                 if name in out_names:
                     outport = actor.outports[name]
@@ -27,11 +29,14 @@ class _ActorRunner(object):
                 else:
                     raise ValueError("{} not in output ports".format(name))
 
+
 class NaiveScheduler(_ActorRunner):
+
     """Scheduler that directly calls connected actors.
 
     Problem: recursion quickly ends in full call stack.
     """
+
     def put_value(self, in_port, value):
         should_run = in_port.put(value)
         if should_run:
@@ -39,7 +44,9 @@ class NaiveScheduler(_ActorRunner):
 
 
 class LinearizedScheduler(_ActorRunner):
+
     """Scheduler that stacks all inputs in a queue and executes them in FIFO order."""
+
     def __init__(self):
         self.execution_queue = deque()
 
@@ -55,6 +62,7 @@ class LinearizedScheduler(_ActorRunner):
 
 
 class SchedulerWorker(threading.Thread, _ActorRunner):
+
     def __init__(self, scheduler, inner_id):
         threading.Thread.__init__(self)
         self.scheduler = scheduler
@@ -69,7 +77,7 @@ class SchedulerWorker(threading.Thread, _ActorRunner):
             pv = self.scheduler.pop_idle_task()
             if pv:
                 port, value = pv
-                should_run = port.put(value)         #  Change to if
+                should_run = port.put(value)  # Change to if
                 if should_run:
                     # print(self.inner_id, port.owner.name, value)
                     self.run_actor(port.owner)
@@ -93,6 +101,7 @@ class SchedulerWorker(threading.Thread, _ActorRunner):
 
 
 class ThreadedScheduler(object):
+
     def __init__(self, max_threads=2):
         self.max_threads = max_threads
         self.threads = []
@@ -104,8 +113,9 @@ class ThreadedScheduler(object):
         with self.state_mutex:
             for port, value in self.queue:
                 if port.owner not in self.running_actors:
+                    # Removes first occurrence - it's probably safe
                     # print("Removing", value)
-                    self.queue.remove((port, value))   # Removes first occurrence - it's probably safe
+                    self.queue.remove((port, value))
                     self.running_actors.append(port.owner)
                     return port, value
             else:
@@ -141,4 +151,3 @@ class ThreadedScheduler(object):
         print("Everything finished. Waiting for threads to end.")
         for thread in self.threads:
             thread.finish()
-

@@ -41,15 +41,14 @@ class Component(object):
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def on_input(self):
-        """This is a virtual method
-        """
-        raise NotImplementedError('Calling a virtual method')
-
     def fire(self):
         """This is a virtual method
         """
         raise NotImplementedError('Calling a virtual method')
+
+    def on_input(self):
+        # print("on_input", all(not port.isempty() for port in self.inports))
+        return all(not port.isempty() for port in self.inports)
 
     def run(self):
         """
@@ -134,10 +133,6 @@ class Actor(Component):
         res = self.fire()
         return res
 
-    def on_input(self):
-        # print("on_input", all(not port.isempty() for port in self.inports))
-        return all(not port.isempty() for port in self.inports)
-
 
 class Composite(Component):
 
@@ -163,12 +158,9 @@ class Composite(Component):
         # run the actor
         # vnutit scheduler
         # zavolat pro vsechny on_input
-        res = self.run()
+        res = self.fire()
         # TODO return res
-
-    def on_input(self):
-        # TODO should work as an actor
-        pass
+        return res
 
     def fire(self):
         # TODO

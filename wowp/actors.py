@@ -25,8 +25,8 @@ class FuncActor(Actor):
         for name in outports:
             self.outports.append(name)
 
-    def fire(self):
-        # print('fire')
+    def run(self):
+        # print('run funcactor')
         args = (port.pop() for port in self.inports)
         func_res = self.func(*args)
 
@@ -67,7 +67,7 @@ class LoopWhile(Actor):
             self.outports['loop_out'].connect(list(inner_actor.inports._ports.values())[0])
             self.inports['loop_in'].connect(list(inner_actor.outports._ports.values())[0])
 
-    def fire(self):
+    def run(self):
         input_val = self.inports['loop_in'].pop()
         res = {}
         if self.condition_func:
@@ -100,7 +100,7 @@ class ShellRunner(Actor):
         self.outports.append('stderr')
         self.outports.append('return')
 
-    def fire(self):
+    def run(self):
         import subprocess
         import tempfile
 
@@ -138,6 +138,6 @@ class Sink(Actor):
     def can_run(self):
         return True
 
-    def fire(self):
+    def run(self):
         for port in self.inports:
             port.pop()

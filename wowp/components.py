@@ -41,7 +41,7 @@ class Component(object):
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def fire(self):
+    def run(self):
         """This is a virtual method
         """
         raise NotImplementedError('Calling a virtual method')
@@ -49,24 +49,6 @@ class Component(object):
     def can_run(self):
         # print("on_input", all(not port.isempty() for port in self.inports))
         return all(not port.isempty() for port in self.inports)
-
-    def run(self):
-        """
-        Run the actor
-        """
-        # first get the result of the fire method
-        res = self.fire()
-        if res is None:
-            res = {}
-        # put values to output ports
-        out_names = self.outports.keys()
-        if not hasattr(res, 'items'):
-            raise ValueError('The fire method must return a dict-like object with items method')
-        for name, value in res.items():
-            if name in out_names:
-                self.outports[name].put(value)
-            else:
-                raise ValueError("{} not in output ports".format(name))
 
     @property
     def inports(self):
@@ -130,7 +112,7 @@ class Actor(Component):
             if inport.name in kwargs:
                 inport.buffer.appendleft(kwargs[inport.name])
         # run the actor
-        res = self.fire()
+        res = self.run()
         return res
 
 
@@ -158,11 +140,11 @@ class Composite(Component):
         # run the actor
         # vnutit scheduler
         # zavolat pro vsechny on_input
-        res = self.fire()
+        res = self.run()
         # TODO return res
         return res
 
-    def fire(self):
+    def run(self):
         # TODO
         pass
 

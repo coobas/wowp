@@ -12,14 +12,14 @@ class _ActorRunner(object):
 
     def run_actor(self, actor):
         # print("Run actor")
-        result = actor.fire()
+        result = actor.run()
         # print("Result: ", result)
         if not result:
             return
         else:
             out_names = actor.outports.keys()
             if not hasattr(result, 'items'):
-                raise ValueError('The fire method must return '
+                raise ValueError('The execute method must return '
                                  'a dict-like object with items method')
             for name, value in result.items():
                 if name in out_names:

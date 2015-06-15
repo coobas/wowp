@@ -44,7 +44,7 @@ properties.
 
     input  ports: ['x']
     output ports: ['y']
-    
+
 
 4. FuncActor is callable
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,7 +61,7 @@ properties.
 
     times2(3) = 6
     times2_actor(3) = 6
-    
+
 
 Simple workflows
 ----------------
@@ -71,10 +71,10 @@ Simple workflows
 2. Ports get connected using the **``+=``** operator
    (``inport += outport``).
 
-\*Better workflow creation will be implemented soon.
-``Actor.get_workflow`` will create a workflow *automagically*. It will
-also be possible to create wokflows *explicitely*, e.g. in cases when
-``get_workflow`` cannot be used.\*
+*Better workflow creation will be implemented soon.
+``Actor.get_workflow`` will create a workflow *\ automagically\ *. It
+will also be possible to create wokflows *\ explicitely\ *, e.g. in
+cases when ``get_workflow`` cannot be used.*
 
 Two actors chained together
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -91,24 +91,26 @@ Let's try something like ``x -> actor1 -> actor2 -> out``.
     # FuncActor output port is by default called out
     actor2.inports['x'] += actor1.outports['out']
 
-Provide an input value using the ``put`` method of input port(s).
+Get the resulting workflow.
 
 .. code:: python
 
-    # put an input value
-    x = 4
-    actor1.inports['x'].put(x)
-    # the workflow should have finished, now get the output
-    y = actor2.outports['out'].pop()
-    print('The result for x = {} is {}'.format(x, y))
-    # check the results
-    assert y == x * 2 + 1
+    wf = actor1.get_workflow()
+
+Execute the workflow just like an actor.
+
+.. code:: python
+
+    wf(x=3)
+
+
 
 
 .. parsed-literal::
 
-    The result for x = 4 is 9
-    
+    {'out': deque([7])}
+
+
 
 Creating a custom actor
 -----------------------
@@ -118,34 +120,40 @@ Creating a custom actor
     from wowp import Actor
 
 Every actor must implement ``on_input`` and ``fire`` methods. \*
-``on_input`` is called whenever a new input arrives (on any port). \*
-``on_input`` must invoke ``self.run()`` when the actor is ready to run.
-\* The ``fire`` method gets inputs from input ports using ``pop``. \*
-The result of ``fire`` must be a ``dict`` (like) object, whose keys are
-output port names.
+``can_run`` is called whenever a new input arrives (on any port). \* The
+``run`` method gets inputs from input ports using ``pop``. \* The result
+of ``run`` must be a ``dict`` (like) object, whose keys are output port
+names.
 
 .. code:: python
 
     class StrActor(Actor):
+    
         def __init__(self, *args, **kwargs):
             super(StrActor, self).__init__(*args, **kwargs)
             # specify input port
             self.inports.append('input')
             # and output ports
             self.outports.append('output')
-        def on_input(self):
-            # call run if any input is available
-            self.run()
-        def fire(self):
+    
+        def can_run(self):
+            # can run if an input value is provided
+            return not self.inports['input'].isempty()
+    
+        def run(self):
             # get input value(s) using .pop()
             value = self.inports['input'].pop()
             # return a dictionary with port names as keys
             res = {'output': str(value)}
             return res
 
+Create an instance.
+
 .. code:: python
 
     actor = StrActor(name='str_actor')
+
+Test the actor by direct call.
 
 .. code:: python
 
@@ -159,4 +167,4 @@ output port names.
 .. parsed-literal::
 
     {'output': '123'}
-    
+

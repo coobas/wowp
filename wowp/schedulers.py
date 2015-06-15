@@ -37,10 +37,16 @@ class NaiveScheduler(_ActorRunner):
     Problem: recursion quickly ends in full call stack.
     """
 
+    def copy(self):
+        return self
+
     def put_value(self, in_port, value):
         should_run = in_port.put(value)
         if should_run:
             self.run_actor(in_port.owner)
+
+    def execute(self):
+        pass
 
 
 class LinearizedScheduler(_ActorRunner):
@@ -49,6 +55,9 @@ class LinearizedScheduler(_ActorRunner):
 
     def __init__(self):
         self.execution_queue = deque()
+
+    def copy(self):
+        return self.__class__()
 
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))
@@ -108,6 +117,9 @@ class ThreadedScheduler(object):
         self.queue = deque()
         self.running_actors = []
         self.state_mutex = threading.RLock()
+
+    def copy(self):
+        return self.__class__(max_threads=self.max_threads)
 
     def pop_idle_task(self):
         with self.state_mutex:

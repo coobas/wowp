@@ -10,7 +10,7 @@ Workflow visualization using graphs
 .. parsed-literal::
 
     Populating the interactive namespace from numpy and matplotlib
-    
+
 
 Import wowp
 -----------

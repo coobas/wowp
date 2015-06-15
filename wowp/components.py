@@ -6,6 +6,7 @@ from .schedulers import NaiveScheduler, LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
+from warnings import warn
 
 
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
@@ -88,10 +89,36 @@ class Component(object):
 
 
 # TODO create workflow (composite) from actor's connections
-    def get_workflow(self):
+    def get_workflow(self, name=None, scheduler=None):
         '''Creates a workflow form actor's connections
         '''
-        raise NotImplementedError('TBI')
+
+        if scheduler is None:
+            scheduler = self.scheduler.copy()
+
+        graph = self.graph
+        leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
+        leaves_in = [n for n, d in graph.in_degree_iter() if d == 0]
+
+        workflow = Workflow(name=name, scheduler=scheduler)
+
+        for node in (graph.node[n] for n in leaves_in):
+            if isinstance(node['ref'], Component):
+                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+            elif isinstance(node['ref'], InPort):
+                workflow.add_inport(node['ref'])
+            else:
+                raise Exception('{} cannot be an input port'.format(node['ref']))
+
+        for node in (graph.node[n] for n in leaves_out):
+            if isinstance(node['ref'], Component):
+                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+            elif isinstance(node['ref'], OutPort):
+                workflow.add_outport(node['ref'])
+            else:
+                raise Exception('{} cannot be an input port'.format(node['ref']))
+
+        return workflow
 
 
 class Actor(Component):
@@ -121,6 +148,11 @@ class Composite(Component):
     """Composite = a group of actors
     """
 
+    def __init__(self, name=None, scheduler=NaiveScheduler()):
+        super().__init__(name=name, scheduler=scheduler)
+        self._in_connections = {}
+        self._out_connections = {}
+
     def __call__(self, scheduler_=None, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
@@ -133,20 +165,44 @@ class Composite(Component):
 
         if scheduler_ is None:
             scheduler_ = LinearizedScheduler()
-        # TODO
+        self.scheduler = scheduler_
+
         for inport in self.inports:
             if inport.name in kwargs:
-                inport.buffer.appendleft(kwargs[inport.name])
-        # run the actor
-        # vnutit scheduler
-        # zavolat pro vsechny on_input
+                inport.put(kwargs[inport.name])
+
         res = self.run()
-        # TODO return res
         return res
 
+    def add_inport(self, inport):
+        # inport is an existing input port
+        self.inports.append(inport.name)
+        self._in_connections[inport.name] = inport
+
+    def add_outport(self, outport):
+        # outport is an existing output port
+        self.outports.append(outport.name)
+        self._out_connections[outport.name] = outport
+
     def run(self):
-        # TODO
-        pass
+        # pass input to target input ports
+        for inport in self.inports.values():
+            value = inport.pop()
+            target = self._in_connections[inport.name]
+            self.scheduler.put_value(target, value)
+        # TODO this does not work for an existing scheduler
+        self.scheduler.execute()
+
+        # run finished
+        res = {}
+        for outport in self.outports.values():
+            source = self._out_connections[outport.name]
+            if not source.isempty():
+                # TODO how/when flatten the resulting deque?
+                # aka how to deal with single/multiple output values
+                res[outport.name] = source.pop_all()
+
+        return res
 
 
 class Workflow(Composite):
@@ -174,8 +230,15 @@ class Ports(object):
     def __len__(self):
         return len(self._ports)
 
+    def __contains__(self, item):
+        return item in self._ports
+
     def __iter__(self):
+        # TODO this might not be intuitive
         return iter(self._ports.values())
+
+    def values(self):
+        return self._ports.values()
 
     def __new_port(self, name, **kwargs):
         return self._port_class(name=name, owner=self._owner, **kwargs)
@@ -197,11 +260,15 @@ class Ports(object):
         # TODO add security
         self._ports[key] = value
 
-    def insert_after(self, existing_port_name, new_port_name):
+    def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
+        if not replace_existing and new_port_name in self._ports:
+            raise Exception('Port {} already exists'.format(new_port_name))
         self._ports.insert_after(existing_port_name,
                                  (new_port_name, self.__new_port(new_port_name)))
 
-    def append(self, new_port_name, **kwargs):
+    def append(self, new_port_name, replace_existing=False, **kwargs):
+        if not replace_existing and new_port_name in self._ports:
+            raise Exception('Port {} already exists'.format(new_port_name))
         self._ports[new_port_name] = self.__new_port(new_port_name, **kwargs)
 
     def keys(self):
@@ -372,7 +439,9 @@ def build_nx_graph(actor):
 
     def _add_actor_node(actor):
         attrs = {"fontsize": "12", "color": "#0093d0"}
-        graph.add_node(_get_name(actor), label=actor.name, shape="box", **attrs)
+        # TODO use wekreds for ref
+        graph.add_node(_get_name(actor), type='actor', ref=actor, label=actor.name,
+                       shape="box", **attrs)
         actors.append(actor)
 
     def _walk_node(actor):
@@ -388,7 +457,8 @@ def build_nx_graph(actor):
                     attrs["color"] = "#ef4135"
                 else:
                     attrs["color"] = "#ffe28a"
-                graph.add_node(_get_name(port), label=port.name, **attrs)
+                graph.add_node(_get_name(port), type='port', ref=port,
+                               label=port.name, **attrs)
                 graph.add_edge(name, _get_name(port))
             for other in port.connections:
                 if (port, other) not in edges:
@@ -404,7 +474,8 @@ def build_nx_graph(actor):
                     attrs["color"] = "#ffffff"
                 else:
                     attrs["color"] = "#9ed8f5"
-                graph.add_node(_get_name(port), label=port.name, **attrs)
+                graph.add_node(_get_name(port), type='port', ref=port,
+                               label=port.name, **attrs)
                 graph.add_edge(_get_name(port), name, )
                 ports.append(port)
             for other in port.connections:
@@ -419,6 +490,7 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
                pos_kwargs=None, draw_kwargs=None):
     """Draw a workflow graph using NetworkX
     """
+
     kwargs = {}
     if pos_kwargs is not None:
         kwargs.update(pos_kwargs)

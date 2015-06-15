@@ -179,3 +179,7 @@ pseudoxml: apidoc
 	
 apidoc:
 	$(APIDOC) -o apidoc ..
+
+tutorial:
+	cd Tutorial && ipython nbconvert --to rst ../../notebooks/Tutorial/*.ipynb
+	

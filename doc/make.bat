@@ -46,10 +46,6 @@ if "%1" == "clean" (
 	goto end
 )
 
-REM run sphinx-apidoc
-del /q apidoc\*
-sphinx-apidoc.exe -o apidoc ..
-
 %SPHINXBUILD% 2> nul
 if errorlevel 9009 (
 	echo.
@@ -64,6 +60,14 @@ if errorlevel 9009 (
 )
 
 if "%1" == "html" (
+	REM run sphinx-apidoc
+	del /q apidoc\*
+	sphinx-apidoc.exe -o apidoc ..
+	REM convert tutorials
+	cd Tutorial
+	ipython nbconvert --to rst ../../notebooks/Tutorial/*.ipynb
+	cd ..
+	REM run Sphinx finally
 	%SPHINXBUILD% -b html %ALLSPHINXOPTS% %BUILDDIR%/html
 	if errorlevel 1 exit /b 1
 	echo.

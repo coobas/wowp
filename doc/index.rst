@@ -6,12 +6,22 @@
 Welcome to wowp's documentation!
 ================================
 
-WOWP stands for a "WOrkfloW Framework in Python".
+wowp, or WOW:-P,  stands for a WOrkfloW framework in Python.
 
 Our goal
 --------
 
-Flow based programming via actors and workflows.
+Wowp enables flow based programming in Python via actors and workflows. We prefer having a clean, straightforward API
+for creating and connecting actors and workflows. The target coding style should be as simple as
+
+.. code:: python
+
+    # connect two actors
+    actor2.inports['x'] += actor1.outports['y']
+    # get the workflow
+    workflow = actor2.get_workflow()
+    # run the workflow
+    workflow(x=1)
 
 
 Tutorials
@@ -22,6 +32,8 @@ Tutorials
 
    Tutorial/basics
    Tutorial/graph_drawing
+   Tutorial/julia
+   Tutorial/Generator actor
 
 
 Reference

@@ -1,4 +1,4 @@
-from .components import Actor
+from ..components import Actor
 import inspect
 
 

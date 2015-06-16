@@ -50,7 +50,7 @@ help:
 clean:
 	rm -rf $(BUILDDIR)/*
 
-html: apidoc
+html: apidoc tutorial
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -182,4 +182,3 @@ apidoc:
 
 tutorial:
 	cd Tutorial && ipython nbconvert --to rst ../../notebooks/Tutorial/*.ipynb
-	

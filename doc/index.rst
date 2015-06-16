@@ -33,6 +33,7 @@ Tutorials
    Tutorial/basics
    Tutorial/graph_drawing
    Tutorial/julia
+   Tutorial/Matlab
    Tutorial/Generator actor
 
 

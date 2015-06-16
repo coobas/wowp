@@ -351,7 +351,7 @@ class Port(object):
         res = NoValue
         if self.buffer:
             # input item is in the buffer
-            res = self.buffer.pop()
+            res = self.buffer.popleft()
             if self.persistent:
                 self._last_value = res
         elif self.persistent and has_value(self._last_value):
@@ -384,7 +384,7 @@ class OutPort(Port):
 
         Value is sent to connected ports (or stored if not connected)
         """
-        self.buffer.appendleft(value)
+        self.buffer.append(value)
 
 
 class InPort(Port):
@@ -408,7 +408,7 @@ class InPort(Port):
         :rtype: bool
         :return: Whether the actor is ready to perform
         """
-        self.buffer.appendleft(value)
+        self.buffer.append(value)
         return self.owner.can_run()
 
 

@@ -23,12 +23,29 @@ for creating and connecting actors and workflows. The target coding style should
     # run the workflow
     workflow(x=1)
 
+Source code
+-----------
+
+Wowp is an open-source project, licensed undet the MIT License. 
+The source code is available from  `Bitbucket <http://bitbucket.org/urbanj/wowp>`_.
+
+Prerequisites
+-------------
+
+* Python 3.4+ (3.3 not tested, 2.7 is not supported at the moment)
+
+Optional:
+
+* Julia for Julia actors
+* Matlab 2015a with Python Engine installed for Matlab actors
+
+
 
 Tutorials
 =========
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Tutorial/basics
    Tutorial/graph_drawing

@@ -108,6 +108,10 @@ def test_ThreadedScheduler_linearity():
     scheduler = ThreadedScheduler(max_threads=thread_count)
     _run_linearity_test(scheduler)
 
+def test_LinearizedScheduler_linearity():
+    scheduler = LinearizedScheduler()
+    _run_linearity_test(scheduler)
+
 
 def _run_linearity_test(scheduler):
     import random
@@ -138,10 +142,10 @@ def _run_linearity_test(scheduler):
     scheduler.execute()
     new_sequence = list(new_actor.outports['x'].pop_all())
 
-    print("Received: ", list(reversed(new_sequence)))
+    print("Received: ", new_sequence)
     print("Expected: ", original_sequence)
 
-    assert list(reversed(new_sequence)) == original_sequence
+    assert new_sequence == original_sequence
 
 
 if __name__ == '__main__':

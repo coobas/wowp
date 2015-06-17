@@ -8,8 +8,10 @@ class FuncActor(Actor):
     """
     # TODO create a derived class instead of an instance
 
-    def __init__(self, func, outports='out'):
-        super(FuncActor, self).__init__(name=func.__name__)
+    def __init__(self, func, outports='out', name=None):
+        if not name:
+            name = func.__name__
+        super(FuncActor, self).__init__(name=name)
         # get function signature
         sig = inspect.signature(func)
         self.func = func

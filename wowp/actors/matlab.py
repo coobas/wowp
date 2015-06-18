@@ -7,8 +7,60 @@ Requires MATLAB Engine for Python
 '''
 
 from . import Actor
-
+import stopit
 import matlab.engine
+from warnings import warn
+
+
+class EngineManager(object):
+
+    """Matlab engine with a shared pool"""
+
+    _engine_pool = []
+
+    def __init__(self, engine_args=None, engine_kwargs=None):
+        if engine_args is None:
+            engine_args = ()
+        if engine_kwargs is None:
+            engine_kwargs = {}
+        self.engine_args = engine_args
+        self.engine_kwargs = engine_kwargs
+
+    def _new_engine(self):
+        return matlab.engine.start_matlab(*self.engine_args, **self.engine_kwargs)
+
+    def pop(self):
+        try:
+            eng = self.__class__._engine_pool.pop()
+        except IndexError:
+            eng = self._new_engine()
+        return eng
+
+    def push(self, eng):
+        self.__class__._engine_pool.append(eng)
+
+    @classmethod
+    def close_all(cls, timeout=10):
+        while cls._engine_pool:
+            eng = cls._engine_pool.pop()
+            with stopit.ThreadingTimeout(timeout) as to_ctx_mgr:
+                assert to_ctx_mgr.state == to_ctx_mgr.EXECUTING
+                try:
+                    eng.quit()
+                except Exception:
+                    # already closed or not working
+                    pass
+            if not to_ctx_mgr:
+                warn('engine {} not responding for {} seconds'.format(str(eng), timeout))
+
+    def __enter__(self):
+        self.engine = self.pop()
+        return self.engine
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.push(self.engine)
+        self.engine = None
+        return exc_type is None
 
 
 class MatlabMethod(Actor):
@@ -30,16 +82,6 @@ class MatlabMethod(Actor):
 
         self._engine = None
 
-    @property
-    def engine(self):
-        if self._engine is None:
-            self._engine = matlab.engine.start_matlab()
-        return self._engine
-
-    @property
-    def _matlab_method(self):
-        return getattr(self.engine, self.method_name)
-
     def run(self):
         args = (port.pop() for port in self.inports)
         func_res = self.__call__(*args)
@@ -53,4 +95,7 @@ class MatlabMethod(Actor):
         return res
 
     def __call__(self, *args, **kwargs):
-        return self._matlab_method(*args, **kwargs)
+        with EngineManager() as engine:
+            mfunc = getattr(engine, self.method_name)
+            res = mfunc(*args, **kwargs)
+        return res

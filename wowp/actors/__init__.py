@@ -8,19 +8,29 @@ class FuncActor(Actor):
     """
     # TODO create a derived class instead of an instance
 
-    def __init__(self, func, outports='out', name=None):
+    def __init__(self, func, outports='out', inports='in', name=None):
         if not name:
             name = func.__name__
         super(FuncActor, self).__init__(name=name)
         # get function signature
-        sig = inspect.signature(func)
+        try:
+            sig = inspect.signature(func)
+            return_annotation = sig.return_annotation
+            # derive ports from func signature
+            inports = (par.name for par in sig.parameters.values())
+            if return_annotation is not inspect.Signature.empty:
+                # if func has a return annotation, use it for outports names
+                outports = return_annotation
+        except ValueError:
+            # e.g. numpy has no support for inspect.signature
+            # --> using manual inports
+            if isinstance(inports, str):
+                inports = (inports, )
+        # save func as attribute
         self.func = func
-        # derive inports from func signature
-        for par in sig.parameters.values():
-            self.inports.append(par.name)
-        if sig.return_annotation is not inspect.Signature.empty:
-            # if func has a return annotation, use it for outports names
-            outports = sig.return_annotation
+        # setup inports
+        for name in inports:
+            self.inports.append(name)
         # setup outports
         if isinstance(outports, str):
             outports = (outports, )
@@ -143,3 +153,4 @@ class Sink(Actor):
     def run(self):
         for port in self.inports:
             port.pop()
+

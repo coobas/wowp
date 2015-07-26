@@ -108,6 +108,7 @@ def test_ThreadedScheduler_linearity():
     scheduler = ThreadedScheduler(max_threads=thread_count)
     _run_linearity_test(scheduler)
 
+
 def test_LinearizedScheduler_linearity():
     scheduler = LinearizedScheduler()
     _run_linearity_test(scheduler)

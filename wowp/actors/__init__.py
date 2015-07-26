@@ -8,7 +8,7 @@ class FuncActor(Actor):
     """
     # TODO create a derived class instead of an instance
 
-    def __init__(self, func, outports='out', inports='in', name=None):
+    def __init__(self, func, outports=None, inports=None, name=None):
         if not name:
             name = func.__name__
         super(FuncActor, self).__init__(name=name)
@@ -17,14 +17,17 @@ class FuncActor(Actor):
             sig = inspect.signature(func)
             return_annotation = sig.return_annotation
             # derive ports from func signature
-            inports = (par.name for par in sig.parameters.values())
-            if return_annotation is not inspect.Signature.empty:
+            if inports is None:
+                inports = (par.name for par in sig.parameters.values())
+            if outports is None and return_annotation is not inspect.Signature.empty:
                 # if func has a return annotation, use it for outports names
                 outports = return_annotation
         except ValueError:
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
-            if isinstance(inports, str):
+            if inports is None:
+                inports = ('in', )
+            elif isinstance(inports, str):
                 inports = (inports, )
         # save func as attribute
         self.func = func
@@ -32,7 +35,9 @@ class FuncActor(Actor):
         for name in inports:
             self.inports.append(name)
         # setup outports
-        if isinstance(outports, str):
+        if outports is None:
+            outports = ('out', )
+        elif isinstance(outports, str):
             outports = (outports, )
         for name in outports:
             self.outports.append(name)

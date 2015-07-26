@@ -50,6 +50,26 @@ class FuncActor(Actor):
             res[name] = value
         return res
 
+    def get_args(self):
+        args = (port.pop() for port in self.inports)
+        kwargs = {'func': self.func,
+                  'outports': tuple(port.name for port in self.outports)}
+        # kwargs['connected_ports'] = list((name for name, port in self.outports.items()
+        #                                   if port.isconnected()))
+
+        return args, kwargs
+
+    @staticmethod
+    def get_result(*args, **kwargs):
+        func_res = kwargs['func'](*args)
+        outports = kwargs['outports']
+
+        if len(outports) == 1:
+            func_res = (func_res, )
+        # iterate over ports and return values
+        res = {name: value for name, value in zip(outports, func_res)}
+        return res
+
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
 

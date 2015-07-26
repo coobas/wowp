@@ -70,6 +70,74 @@ class LinearizedScheduler(_ActorRunner):
                 self.run_actor(in_port.owner)
 
 
+class IPyClusterScheduler(_ActorRunner):
+
+    """
+    Scheduler using IPython Cluster.
+    """
+
+    def __init__(self, profile=None):
+        self.process_pool = []
+        self.running_actors = []
+        self.execution_queue = deque()
+        self.init_cluster(profile)
+
+    def copy(self):
+        return self.__class__(max_procs=self.max_procs)
+
+    def put_value(self, in_port, value):
+        self.execution_queue.appendleft((in_port, value))
+
+    def init_cluster(self, profile):
+        '''Get a connection (view) to an IPython cluster
+        '''
+
+        from IPython.parallel import Client
+
+        self._ipy_rc = Client(profile=profile)
+        self._ipy_dv = self._ipy_rc[:]
+        self._ipy_lv = self._ipy_rc.load_balanced_view()
+
+    def execute(self):
+
+        while self.execution_queue or self.running_actors:
+            while self.execution_queue:
+                in_port, value = self.execution_queue.pop()
+                should_run = in_port.put(value)
+                if should_run:
+                    self.running_actors.append((in_port.owner, self.run_actor(in_port.owner)))
+            pending = []
+            for actor, job in self.running_actors:
+                if job.ready():
+                    # process result
+                    if not job.successful():
+                        warnings.warn('actor {} failed'.format(actor))
+                        continue
+                    result = job.get()
+                    if result:
+                        # empty results don't need any processing
+                        out_names = actor.outports.keys()
+                        if not hasattr(result, 'items'):
+                            raise ValueError('The execute method must return '
+                                             'a dict-like object with items method')
+                        for name, value in result.items():
+                            if name in out_names:
+                                outport = actor.outports[name]
+                                outport.put(value)
+                                self.on_outport_put_value(outport)
+                            else:
+                                raise ValueError("{} not in output ports".format(name))
+
+                else:
+                    pending.append((actor, job))
+            self.running_actors = pending
+
+    def run_actor(self, actor):
+        # print("Run actor {}".format(actor))
+        args, kwargs = actor.get_args()
+        return self._ipy_lv.apply_async(actor.get_result, *args, **kwargs)
+
+
 class SchedulerWorker(threading.Thread, _ActorRunner):
 
     def __init__(self, scheduler, inner_id):

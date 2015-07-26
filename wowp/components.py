@@ -237,6 +237,9 @@ class Ports(object):
         # TODO this might not be intuitive
         return iter(self._ports.values())
 
+    def items(self):
+        return self._ports.items()
+
     def values(self):
         return self._ports.values()
 
@@ -337,6 +340,9 @@ class Port(object):
             return False
         else:
             return True
+
+    def isconnected(self):
+        return bool(self._connections)
 
     def disconnect(self, other):
         if other not in self._connections:

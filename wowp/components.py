@@ -49,7 +49,7 @@ class Component(object):
 
     def can_run(self):
         # print("on_input", all(not port.isempty() for port in self.inports))
-        return all(not port.isempty() for port in self.inports)
+        return not any(port.isempty() for port in self.inports)
 
     @property
     def inports(self):

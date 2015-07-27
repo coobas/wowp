@@ -57,14 +57,12 @@ def _run_tree_512_test(scheduler):
     assert(2 ** power == last.outports['a'].pop())
 
 
-def test_ThreadedScheduler_tree512():
-    scheduler = ThreadedScheduler(max_threads=8)
-    _run_tree_512_test(scheduler)
-
-
-def test_LinearizedScheduler_tree512():
-    scheduler = LinearizedScheduler()
-    _run_tree_512_test(scheduler)
+def test_all_schedulers():
+    for scheduler in (ThreadedScheduler(max_threads=8),
+                      LinearizedScheduler()):
+        for case in (_run_tree_512_test,
+                     _run_linearity_test):
+            yield case, scheduler
 
 
 def test_ThrededScheduler_creates_threads_and_executes_all():
@@ -101,17 +99,6 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
     assert thread_count >= len(thread_ids)
     assert 1 < len(thread_ids)
     assert jobs_executed == branch_count * branch_length
-
-
-def test_ThreadedScheduler_linearity():
-    thread_count = 4
-    scheduler = ThreadedScheduler(max_threads=thread_count)
-    _run_linearity_test(scheduler)
-
-
-def test_LinearizedScheduler_linearity():
-    scheduler = LinearizedScheduler()
-    _run_linearity_test(scheduler)
 
 
 def _run_linearity_test(scheduler):

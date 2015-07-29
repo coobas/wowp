@@ -56,7 +56,7 @@ class FuncActor(Actor):
         return res
 
     def get_args(self):
-        args = (port.pop() for port in self.inports)
+        args = tuple(port.pop() for port in self.inports)
         kwargs = {'func': self.func,
                   'outports': tuple(port.name for port in self.outports)}
         # kwargs['connected_ports'] = list((name for name, port in self.outports.items()

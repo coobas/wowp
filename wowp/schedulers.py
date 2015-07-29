@@ -79,8 +79,10 @@ class IPyClusterScheduler(_ActorRunner):
 
     def __init__(self, profile=None):
         self.process_pool = []
-        self.running_actors = []
+        # actor: job
+        self.running_actors = {}
         self.execution_queue = deque()
+        self.wait_queue = []
         self.init_cluster(profile)
 
     def copy(self):
@@ -101,14 +103,25 @@ class IPyClusterScheduler(_ActorRunner):
 
     def execute(self):
 
-        while self.execution_queue or self.running_actors:
+        while self.execution_queue or self.running_actors or self.wait_queue:
             while self.execution_queue:
                 in_port, value = self.execution_queue.pop()
                 should_run = in_port.put(value)
                 if should_run:
-                    self.running_actors.append((in_port.owner, self.run_actor(in_port.owner)))
-            pending = []
-            for actor, job in self.running_actors:
+                    # waiting to be run
+                    self.wait_queue.append(in_port.owner)
+                    # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))
+            pending = []  # temporary container
+            for actor in self.wait_queue:
+                # run actors only if not already running
+                if actor not in self.running_actors:
+                    # TODO can we iterate and remove at the same time?
+                    self.running_actors[actor] = self.run_actor(actor)
+                else:
+                    pending.append(actor)
+            self.wait_queue = pending
+            pending = {}  # temporary container
+            for actor, job in self.running_actors.items():
                 if job.ready():
                     # process result
                     # raise RemoteException in case of failure
@@ -128,7 +141,7 @@ class IPyClusterScheduler(_ActorRunner):
                                 raise ValueError("{} not in output ports".format(name))
 
                 else:
-                    pending.append((actor, job))
+                    pending[actor] = job
             self.running_actors = pending
 
     def run_actor(self, actor):

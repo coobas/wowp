@@ -47,9 +47,9 @@ def app_fn(x) -> ('x'):
     sleep(s)
     return x
 
-def _run_linearity_test(scheduler):
+def _run_linearity_test(scheduler, size=100, ntimes=1):
 
-    max_ = 100
+    max_ = size
 
     original_sequence = list(range(max_))
 
@@ -58,20 +58,27 @@ def _run_linearity_test(scheduler):
     new_actor = FuncActor(app_fn)
     orig_actor.outports["x"].connect(new_actor.inports["x"])
 
-    for i in range(max_):
-        scheduler.put_value(orig_actor.inports["x"], i)
+    for t in range(ntimes):
+        for i in range(max_):
+            scheduler.put_value(orig_actor.inports["x"], i)
 
-    scheduler.execute()
-    new_sequence = list(new_actor.outports['x'].pop_all())
+        scheduler.execute()
+        new_sequence = list(new_actor.outports['x'].pop_all())
 
-    print("Received: ", new_sequence)
-    print("Expected: ", original_sequence)
-
-    assert new_sequence == original_sequence
+        try:
+            assert new_sequence == original_sequence
+        except AssertionError:
+            print("Received: ", new_sequence)
+            print("Expected: ", original_sequence)
+            raise
 
 
 if __name__ == '__main__':
-    for case in (_run_tree_512_test, _run_linearity_test, ):
+    tests = (
+        _run_tree_512_test,
+        lambda scheduler: _run_linearity_test(scheduler, size=100, ntimes=5),
+    )
+    for case in (tests):
         print('testing {}'.format(case))
         scheduler = IPyClusterScheduler()
         case(scheduler)

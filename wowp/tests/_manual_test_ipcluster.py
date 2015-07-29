@@ -1,7 +1,5 @@
 from wowp.actors import FuncActor, LoopWhile
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler, IPyClusterScheduler
-import random
-from time import sleep
 
 
 def _run_tree_512_test(scheduler):
@@ -41,6 +39,9 @@ def orig(x) -> ('x'):
     return x
 
 def app_fn(x) -> ('x'):
+    import random
+    from time import sleep
+
     # print("In act2:", x)
     s = random.randint(1, 30) / 1000.0
     sleep(s)

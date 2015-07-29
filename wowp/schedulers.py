@@ -111,9 +111,7 @@ class IPyClusterScheduler(_ActorRunner):
             for actor, job in self.running_actors:
                 if job.ready():
                     # process result
-                    if not job.successful():
-                        warnings.warn('actor {} failed'.format(actor))
-                        continue
+                    # raise RemoteException in case of failure
                     result = job.get()
                     if result:
                         # empty results don't need any processing

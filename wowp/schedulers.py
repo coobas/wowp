@@ -5,6 +5,13 @@ import warnings
 
 class _ActorRunner(object):
 
+    """Base class for objects that run actors and process their results.
+
+    It is ok, if the runner is a scheduler at the same time. The separation
+    of concepts exists only for the cases when a scheduler needs to run
+    actors in parallel (such as ThreadedScheduler).
+    """
+
     def on_outport_put_value(self, outport):
         if outport.connections:
             value = outport.pop()
@@ -159,7 +166,10 @@ class IPyClusterScheduler(_ActorRunner):
         return self._ipy_lv.apply_async(actor.get_result, *args, **kwargs)
 
 
-class SchedulerWorker(threading.Thread, _ActorRunner):
+class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):
+
+    """Thread object that executes run after run of the ThreadedScheduler actors.
+    """
 
     def __init__(self, scheduler, inner_id):
         threading.Thread.__init__(self)
@@ -187,13 +197,14 @@ class SchedulerWorker(threading.Thread, _ActorRunner):
                 pass
                 # print(self.inner_id, "Nothing to do")
                 sleep(0.02)
-        print(self.inner_id, "End")
+        # print(self.inner_id, "End")
 
     def put_value(self, in_port, value):
         # print(self.inner_id, " worker put ", value)
         self.scheduler.put_value(in_port, value)
 
     def finish(self):
+        """Finish after the current running job is done."""
         with self.state_mutex:
             self.finished = True
 
@@ -203,7 +214,7 @@ class ThreadedScheduler(object):
     def __init__(self, max_threads=2):
         self.max_threads = max_threads
         self.threads = []
-        self.queue = deque()
+        self.execution_queue = deque()
         self.running_actors = []
         self.state_mutex = threading.RLock()
 
@@ -212,11 +223,11 @@ class ThreadedScheduler(object):
 
     def pop_idle_task(self):
         with self.state_mutex:
-            for port, value in self.queue:
+            for port, value in self.execution_queue:
                 if port.owner not in self.running_actors:
                     # Removes first occurrence - it's probably safe
                     # print("Removing", value)
-                    self.queue.remove((port, value))
+                    self.execution_queue.remove((port, value))
                     self.running_actors.append(port.owner)
                     return port, value
             else:
@@ -225,11 +236,11 @@ class ThreadedScheduler(object):
     def put_value(self, in_port, value):
         with self.state_mutex:     # Probably not necessary
             # print("put ", value, ", in queue: ", len(self.queue))
-            self.queue.append((in_port, value))
+            self.execution_queue.append((in_port, value))
 
     def is_running(self):
         with self.state_mutex:
-            return bool(self.running_actors or self.queue)
+            return bool(self.running_actors or self.execution_queue)
 
     def on_actor_finished(self, actor):
         with self.state_mutex:
@@ -240,7 +251,7 @@ class ThreadedScheduler(object):
     def execute(self):
         with self.state_mutex:     # Probably not necessary
             for i in range(self.max_threads):
-                thread = SchedulerWorker(self, i)
+                thread = ThreadedSchedulerWorker(self, i)
                 self.threads.append(thread)
                 thread.start()
                 # print("Thread started", thread.ident)
@@ -249,6 +260,6 @@ class ThreadedScheduler(object):
             thread.join()
 
     def finish_all_threads(self):
-        print("Everything finished. Waiting for threads to end.")
+        # print("Everything finished. Waiting for threads to end.")
         for thread in self.threads:
             thread.finish()

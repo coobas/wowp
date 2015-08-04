@@ -104,45 +104,54 @@ class IPyClusterScheduler(_ActorRunner):
     def execute(self):
 
         while self.execution_queue or self.running_actors or self.wait_queue:
-            while self.execution_queue:
-                in_port, value = self.execution_queue.pop()
-                should_run = in_port.put(value)
-                if should_run:
-                    # waiting to be run
-                    self.wait_queue.append(in_port.owner)
-                    # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))
-            pending = []  # temporary container
-            for actor in self.wait_queue:
-                # run actors only if not already running
-                if actor not in self.running_actors:
-                    # TODO can we iterate and remove at the same time?
-                    self.running_actors[actor] = self.run_actor(actor)
-                else:
-                    pending.append(actor)
-            self.wait_queue = pending
-            pending = {}  # temporary container
-            for actor, job in self.running_actors.items():
-                if job.ready():
-                    # process result
-                    # raise RemoteException in case of failure
-                    result = job.get()
-                    if result:
-                        # empty results don't need any processing
-                        out_names = actor.outports.keys()
-                        if not hasattr(result, 'items'):
-                            raise ValueError('The execute method must return '
-                                             'a dict-like object with items method')
-                        for name, value in result.items():
-                            if name in out_names:
-                                outport = actor.outports[name]
-                                outport.put(value)
-                                self.on_outport_put_value(outport)
-                            else:
-                                raise ValueError("{} not in output ports".format(name))
+            self._try_empty_execution_queue()
+            self._try_empty_wait_queue()
+            self._try_empty_ready_jobs()
 
-                else:
-                    pending[actor] = job
-            self.running_actors = pending
+    def _try_empty_ready_jobs(self):
+        pending = {}  # temporary container
+        for actor, job in self.running_actors.items():
+            if job.ready():
+                # process result
+                # raise RemoteException in case of failure
+                result = job.get()
+                if result:
+                    # empty results don't need any processing
+                    out_names = actor.outports.keys()
+                    if not hasattr(result, 'items'):
+                        raise ValueError('The execute method must return '
+                                         'a dict-like object with items method')
+                    for name, value in result.items():
+                        if name in out_names:
+                            outport = actor.outports[name]
+                            outport.put(value)
+                            self.on_outport_put_value(outport)
+                        else:
+                            raise ValueError("{} not in output ports".format(name))
+
+            else:
+                pending[actor] = job
+        self.running_actors = pending
+
+    def _try_empty_wait_queue(self):
+        pending = []  # temporary container
+        for actor in self.wait_queue:
+            # run actors only if not already running
+            if actor not in self.running_actors:
+                # TODO can we iterate and remove at the same time?
+                self.running_actors[actor] = self.run_actor(actor)
+            else:
+                pending.append(actor)
+        self.wait_queue = pending
+
+    def _try_empty_execution_queue(self):
+        while self.execution_queue:
+            in_port, value = self.execution_queue.pop()
+            should_run = in_port.put(value)
+            if should_run:
+                # waiting to be run
+                self.wait_queue.append(in_port.owner)
+                # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))
 
     def run_actor(self, actor):
         # print("Run actor {}".format(actor))
@@ -236,7 +245,7 @@ class ThreadedScheduler(object):
                 thread.start()
                 # print("Thread started", thread.ident)
         for thread in self.threads:
-            print("Join thread")
+            # print("Join thread")
             thread.join()
 
     def finish_all_threads(self):

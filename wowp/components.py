@@ -37,12 +37,28 @@ class Component(object):
     def __init__(self, name=None, scheduler=NaiveScheduler()):
         if name is None:
             name = self.__class__.__name__.lower()
+        assert is_valid_componenet_name(name)
         self.name = name
         self.scheduler = scheduler
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def run(self):
+    def get_run_args(self):
+        """
+        Prepare arguments (args, kwargs) for the run method
+
+        The default behaviour is to put values from
+        all connected input ports to kwargs.
+
+        :return: args, kwargs
+        :rtype: tuple
+        """
+        args = ()
+        kwargs = {port.name: port.pop() for port in self.inports if port.isconnected()}
+        return args, kwargs
+
+    @classmethod
+    def run(cls, *args, **kwargs):
         """This is a virtual method
         """
         raise NotImplementedError('Calling a virtual method')
@@ -184,25 +200,38 @@ class Composite(Component):
         self.outports.append(outport.name)
         self._out_connections[outport.name] = outport
 
-    def run(self):
-        # pass input to target input ports
-        for inport in self.inports.values():
-            value = inport.pop()
-            target = self._in_connections[inport.name]
-            self.scheduler.put_value(target, value)
-        # TODO this does not work for an existing scheduler
-        self.scheduler.execute()
-
-        # run finished
-        res = {}
-        for outport in self.outports.values():
-            source = self._out_connections[outport.name]
-            if not source.isempty():
-                # TODO how/when flatten the resulting deque?
-                # aka how to deal with single/multiple output values
-                res[outport.name] = source.pop_all()
-
-        return res
+    # def get_run_args(self):
+    #     args = ()
+    #     kwargs = {}
+    #     kwargs['inports'] = {}
+    #     for inport in self.inports.values():
+    #         name = inport.name
+    #         kwargs['inports'][name]['value'] = inport.pop()
+    #         kwargs['inports'][name]['target'] = self._in_connections[inport.name]
+    #     kwargs['outports'] = self.outports
+    #     # TODO this does not seem right
+    #     kwargs['scheduler'] = self.scheduler
+    #
+    # @classmethod
+    # def run(cls, *args, **kwargs):
+    #     # pass input to target input ports
+    #     inports = kwargs['inports']
+    #     scheduler = kwargs['scheduler']
+    #     for inport in inports.values():
+    #         scheduler.put_value(inport['target'], inport['value'])
+    #     # TODO this does not work for an existing scheduler
+    #     scheduler.execute()
+    #
+    #     # run finished
+    #     res = {}
+    #     for outport in kwargs['outports'].values():
+    #         source = self._out_connections[outport.name]
+    #         if not source.isempty():
+    #             # TODO how/when flatten the resulting deque?
+    #             # aka how to deal with single/multiple output values
+    #             res[outport.name] = source.pop_all()
+    #
+    #     return res
 
 
 class Workflow(Composite):
@@ -284,6 +313,7 @@ class Port(object):
     """
 
     def __init__(self, name, owner, persistent=False, default=NoValue):
+        assert is_valid_port_name(name)
         self.name = name
         self.owner = owner
         self.persistent = persistent
@@ -418,13 +448,19 @@ class InPort(Port):
         return self.owner.can_run()
 
 
-def valid_name(name):
-    """Validate name (for actors, ports etc.)
+def is_valid_port_name(name):
+    """Validate port name
     """
     if name.isidentifier() and not keyword.iskeyword(name):
         return True
     else:
         return False
+
+def is_valid_componenet_name(name):
+    """Validate actor name
+    """
+    # so far no restrictions
+    return True
 
 
 def build_nx_graph(actor):

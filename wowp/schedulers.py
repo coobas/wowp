@@ -20,7 +20,8 @@ class _ActorRunner(object):
 
     def run_actor(self, actor):
         # print("Run actor")
-        result = actor.run()
+        args, kwargs = actor.get_run_args()
+        result = actor.run(*args, **kwargs)
         # print("Result: ", result)
         if not result:
             return
@@ -162,8 +163,8 @@ class IPyClusterScheduler(_ActorRunner):
 
     def run_actor(self, actor):
         # print("Run actor {}".format(actor))
-        args, kwargs = actor.get_args()
-        return self._ipy_lv.apply_async(actor.get_result, *args, **kwargs)
+        args, kwargs = actor.get_run_args()
+        return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
 
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):

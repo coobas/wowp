@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor, LoopWhile
+from wowp.actors import FuncActor, Switch
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
 
 import nose
@@ -13,7 +13,7 @@ def test_LinearizedScheduler_loop1000():
     def func(x) -> ('x'):
         return x + 1
     fa = FuncActor(func)
-    lw = LoopWhile("a_loop", condition)
+    lw = Switch("a_loop", condition)
 
     fa.inports['x'] += lw.outports['loop_out']
     lw.inports['loop_in'] += fa.outports['x']

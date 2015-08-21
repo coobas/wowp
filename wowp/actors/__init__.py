@@ -42,20 +42,7 @@ class FuncActor(Actor):
         for name in outports:
             self.outports.append(name)
 
-    def run(self):
-        # print('run funcactor')
-        args = (port.pop() for port in self.inports)
-        func_res = self.func(*args)
-
-        if len(self.outports) == 1:
-            func_res = (func_res,)
-        # iterate over ports and return values
-        res = {}
-        for name, value in zip(self.outports.keys(), func_res):
-            res[name] = value
-        return res
-
-    def get_args(self):
+    def get_run_args(self):
         args = tuple(port.pop() for port in self.inports)
         kwargs = {'func': self.func,
                   'outports': tuple(port.name for port in self.outports)}
@@ -64,8 +51,8 @@ class FuncActor(Actor):
 
         return args, kwargs
 
-    @staticmethod
-    def get_result(*args, **kwargs):
+    @classmethod
+    def run(cls, *args, **kwargs):
         func_res = kwargs['func'](*args)
         outports = kwargs['outports']
 
@@ -79,13 +66,13 @@ class FuncActor(Actor):
         return self.func(*args, **kwargs)
 
 
-class LoopWhile(Actor):
+class Switch(Actor):
 
     """While loop actor
     """
 
     def __init__(self, name=None, condition_func=None, inner_actor=None):
-        super(LoopWhile, self).__init__(name=name)
+        super(Switch, self).__init__(name=name)
         # self.inports.append('initial')
         self.inports.append('loop_in')
         self.outports.append('loop_out')
@@ -104,11 +91,18 @@ class LoopWhile(Actor):
             self.outports['loop_out'].connect(list(inner_actor.inports._ports.values())[0])
             self.inports['loop_in'].connect(list(inner_actor.outports._ports.values())[0])
 
-    def run(self):
-        input_val = self.inports['loop_in'].pop()
+    def get_run_args(self):
+        kwargs = {}
+        kwargs['input_val'] = self.inports['loop_in'].pop()
+        kwargs['condition_func'] = self.condition_func
+        args = ()
+        return args, kwargs
+
+    @classmethod
+    def run(cls, *args, condition_func=None, input_val=None):
         res = {}
-        if self.condition_func:
-            if self.condition_func(input_val):
+        if condition_func:
+            if condition_func(input_val):
                 res['loop_out'] = input_val
             else:
                 res['final'] = input_val
@@ -132,35 +126,45 @@ class ShellRunner(Actor):
 
         self.binary = binary
         self.shell = shell
-        self.inports.append('in')
+        self.inports.append('inp')
         self.outports.append('stdout')
         self.outports.append('stderr')
-        self.outports.append('return')
+        self.outports.append('ret')
 
-    def run(self):
-        import subprocess
-        import tempfile
-
-        vals = self.inports['in'].pop()
+    def get_run_args(self):
+        vals = self.inports['inp'].pop()
         if isinstance(vals, str):
             vals = (vals,)
         args = self.base_command + vals
+        kwargs = {
+            'shell': self.shell,
+            'binary': self.binary,
+        }
+        return args, kwargs
+
+    @classmethod
+    def run(cls, *args, **kwargs):
+        import subprocess
+        import tempfile
+
         print(args)
 
-        if self.binary:
+        if kwargs['binary']:
             mode = "w+b"
         else:
             mode = "w+t"
 
         with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
-            result = subprocess.call(args, stdout=fout, stderr=ferr, shell=self.shell)
+            if kwargs['shell']:
+                result = subprocess.call(' '.join(args), stdout=fout, stderr=ferr, shell=kwargs['shell'])
+            else:
+                result = subprocess.call(args, stdout=fout, stderr=ferr, shell=kwargs['shell'])
             fout.seek(0)
             ferr.seek(0)
-
             cout = fout.read()
             cerr = ferr.read()
         res = {
-            'return': result,
+            'ret': result,
             'stdout': cout,
             'stderr': cerr
         }
@@ -175,7 +179,12 @@ class Sink(Actor):
     def can_run(self):
         return True
 
-    def run(self):
+    def get_run_args(self):
         for port in self.inports:
             port.pop()
+        return (), {}
+
+    @staticmethod
+    def run(*args, **kwargs):
+        pass
 

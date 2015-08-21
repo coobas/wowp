@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor, LoopWhile
+from wowp.actors import FuncActor, Switch
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler, IPyClusterScheduler
 
 

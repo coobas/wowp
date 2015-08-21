@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor, LoopWhile, ShellRunner
+from wowp.actors import FuncActor, Switch, ShellRunner
 from wowp.schedulers import NaiveScheduler
 import nose
 
@@ -37,7 +37,7 @@ def test_LoopWhileActor():
     def func(x) -> ('x'):
         return x + 1
     fa = FuncActor(func)
-    lw = LoopWhile("a_loop", condition)
+    lw = Switch("a_loop", condition)
 
     fa.inports['x'] += lw.outports['loop_out']
     lw.inports['loop_in'] += fa.outports['x']
@@ -58,7 +58,7 @@ def test_LoopWhileActorWithInner():
     def func(x) -> ('x'):
         return x + 1
     fa = FuncActor(func)
-    lw = LoopWhile("a_loop", condition, inner_actor=fa)
+    lw = Switch("a_loop", condition, inner_actor=fa)
 
     lw.inports['loop_in'].put(0)
 
@@ -73,11 +73,11 @@ def test_Shellrunner():
         runner = ShellRunner("echo", shell=True)
     else:
         runner = ShellRunner("echo", shell=False)
-    runner.inports['in'].put("test")
+    runner.inports['inp'].put("test")
 
     NaiveScheduler().run_actor(runner)
 
-    rvalue = runner.outports['return'].pop()
+    rvalue = runner.outports['ret'].pop()
     stdout = runner.outports['stdout'].pop()
     stderr = runner.outports['stderr'].pop()
 

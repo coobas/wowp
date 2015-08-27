@@ -174,11 +174,11 @@ class Composite(Component):
         :rtype: dict for multiple ports
         """
 
+        if self.scheduler is not None:
+            # prefer self.scheduler
+            scheduler = self.scheduler
         if scheduler is None:
-            if self.scheduler is not None:
-                scheduler = self.scheduler
-            else:
-                raise ValueError('scheduler must be specified')
+            raise ValueError('scheduler must be specified')
 
         return scheduler.run_workflow(self, **kwargs)
 

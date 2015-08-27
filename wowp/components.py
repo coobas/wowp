@@ -34,12 +34,11 @@ class Component(object):
     """Base WOWP component class
     """
 
-    def __init__(self, name=None, scheduler=NaiveScheduler()):
+    def __init__(self, name=None):
         if name is None:
             name = self.__class__.__name__.lower()
         assert is_valid_componenet_name(name)
         self.name = name
-        self.scheduler = scheduler
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
@@ -104,19 +103,16 @@ class Component(object):
         return build_nx_graph(self)
 
 
-# TODO create workflow (composite) from actor's connections
-    def get_workflow(self, name=None, scheduler=None):
+    # TODO create workflow (composite) from actor's connections
+    def get_workflow(self, name=None):
         '''Creates a workflow form actor's connections
         '''
-
-        if scheduler is None:
-            scheduler = self.scheduler.copy()
 
         graph = self.graph
         leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
         leaves_in = [n for n, d in graph.in_degree_iter() if d == 0]
 
-        workflow = Workflow(name=name, scheduler=scheduler)
+        workflow = Workflow(name=name)
 
         for node in (graph.node[n] for n in leaves_in):
             if isinstance(node['ref'], Component):
@@ -164,10 +160,11 @@ class Composite(Component):
     """Composite = a group of actors
     """
 
-    def __init__(self, name=None, scheduler=NaiveScheduler()):
-        super().__init__(name=name, scheduler=scheduler)
-        self._in_connections = {}
-        self._out_connections = {}
+    def __init__(self, name=None, scheduler=None):
+        super().__init__(name=name)
+        # self._in_connections = {}
+        # self._out_connections = {}
+        self.scheduler = scheduler
 
     def __call__(self, scheduler_=None, **kwargs):
         """

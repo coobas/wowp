@@ -1,5 +1,6 @@
 from wowp.actors import FuncActor, Switch, ShellRunner
 from wowp.schedulers import NaiveScheduler
+from wowp.components import Actor
 import nose
 
 
@@ -28,6 +29,37 @@ def test_FuncActor_call():
     fa = FuncActor(func)
 
     assert func(x, y) == fa(x, y)
+
+
+def test_custom_actor_call():
+
+    class StrActor(Actor):
+
+        def __init__(self, *args, **kwargs):
+            super(StrActor, self).__init__(*args, **kwargs)
+            # specify input port
+            self.inports.append('input')
+            # and output ports
+            self.outports.append('output')
+
+        def get_run_args(self):
+            # get input value(s) using .pop()
+            args = (self.inports['input'].pop(), )
+            kwargs = {}
+            return args, kwargs
+
+        @staticmethod
+        def run(value):
+            # return a dictionary with port names as keys
+            res = {'output': str(value)}
+            return res
+
+
+    actor = StrActor(name='str_actor')
+    value = 123
+    print(actor(input=value))
+    # and check that the output is as expected
+    assert actor(input=value)['output'] == str(value)
 
 
 def test_LoopWhileActor():

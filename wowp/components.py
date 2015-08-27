@@ -151,7 +151,8 @@ class Actor(Component):
             if inport.name in kwargs:
                 inport.buffer.appendleft(kwargs[inport.name])
         # run the actor
-        res = self.run()
+        args, kwargs = self.get_run_args()
+        res = self.run(*args, **kwargs)
         return res
 
 
@@ -178,7 +179,8 @@ class Composite(Component):
             # prefer self.scheduler
             scheduler = self.scheduler
         if scheduler is None:
-            raise ValueError('scheduler must be specified')
+            # default scheduler for __call__
+            scheduler = LinearizedScheduler()
 
         return scheduler.run_workflow(self, **kwargs)
 

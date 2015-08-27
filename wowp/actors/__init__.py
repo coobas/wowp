@@ -26,7 +26,7 @@ class FuncActor(Actor):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('in', )
+                inports = ('inp', )
             elif isinstance(inports, str):
                 inports = (inports, )
         # save func as attribute

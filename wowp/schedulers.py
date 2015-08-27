@@ -1,6 +1,7 @@
 from collections import deque
 import threading
 import warnings
+import wowp.components
 
 
 class _ActorRunner(object):
@@ -13,6 +14,13 @@ class _ActorRunner(object):
     """
 
     def on_outport_put_value(self, outport):
+        '''
+        Propagates values put into an output port.
+
+        Must be called after outport.put
+        :param outport: output port
+        :return: None
+        '''
         if outport.connections:
             value = outport.pop()
             for inport in outport.connections:
@@ -20,23 +28,44 @@ class _ActorRunner(object):
 
     def run_actor(self, actor):
         # print("Run actor")
-        args, kwargs = actor.get_run_args()
-        result = actor.run(*args, **kwargs)
-        # print("Result: ", result)
-        if not result:
-            return
+        # TODO replace by an attribute / method call
+        if isinstance(actor, wowp.components.Composite):
+            self.run_workflow(actor)
         else:
-            out_names = actor.outports.keys()
-            if not hasattr(result, 'items'):
-                raise ValueError('The execute method must return '
-                                 'a dict-like object with items method')
-            for name, value in result.items():
-                if name in out_names:
-                    outport = actor.outports[name]
-                    outport.put(value)
-                    self.on_outport_put_value(outport)
-                else:
-                    raise ValueError("{} not in output ports".format(name))
+            args, kwargs = actor.get_run_args()
+            result = actor.run(*args, **kwargs)
+            # print("Result: ", result)
+            if not result:
+                return
+            else:
+                out_names = actor.outports.keys()
+                if not hasattr(result, 'items'):
+                    raise ValueError('The execute method must return '
+                                     'a dict-like object with items method')
+                for name, value in result.items():
+                    if name in out_names:
+                        outport = actor.outports[name]
+                        outport.put(value)
+                        self.on_outport_put_value(outport)
+                    else:
+                        raise ValueError("{} not in output ports".format(name))
+
+    def run_workflow(self, workflow, **kwargs):
+        inport_names = tuple(port.name for port in workflow.inports)
+        for key, value in kwargs.items():
+            if key not in inport_names:
+                raise ValueError('{} is not an inport name'.format(key))
+            inport = workflow.inports[key]
+            # put values to connected ports
+            can_run = inport.put(kwargs[inport.name])
+            if can_run:
+                self.run_actor(inport.owner)
+        # TODO can this be run inside self.execute itsef?
+        self.execute()
+
+        # collect results from output ports
+        res = {port.name: port.pop_all() for port in workflow.outports}
+        return res
 
 
 class NaiveScheduler(_ActorRunner):

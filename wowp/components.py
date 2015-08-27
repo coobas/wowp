@@ -166,69 +166,98 @@ class Composite(Component):
         # self._out_connections = {}
         self.scheduler = scheduler
 
-    def __call__(self, scheduler_=None, **kwargs):
+    def __call__(self, scheduler=None, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
 
-        :param scheduler_: execution scheduler (defaul
+        :param scheduler_: execution scheduler (default LinearizedScheduler)
         :param kwargs: input ports values
         :return: output port(s) value(s)
         :rtype: dict for multiple ports
         """
 
-        if scheduler_ is None:
-            scheduler_ = LinearizedScheduler()
-        self.scheduler = scheduler_
+        if scheduler is None:
+            if self.scheduler is not None:
+                scheduler = self.scheduler
+            else:
+                raise ValueError('scheduler must be specified')
 
-        for inport in self.inports:
-            if inport.name in kwargs:
-                inport.put(kwargs[inport.name])
-
-        res = self.run()
-        return res
-
-    def add_inport(self, inport):
-        # inport is an existing input port
-        self.inports.append(inport.name)
-        self._in_connections[inport.name] = inport
-
-    def add_outport(self, outport):
-        # outport is an existing output port
-        self.outports.append(outport.name)
-        self._out_connections[outport.name] = outport
+        return scheduler.run_workflow(self, **kwargs)
+        #
+        # inport_names = tuple(port.name for port in self.inports)
+        # for key, value in kwargs.items():
+        #     if key not in inport_names:
+        #         raise ValueError('{} is not an inport name'.format(key))
+        #     for inport in self.inports[key].connections:
+        #         # put values to connected ports
+        #         can_run = inport.put(kwargs[inport.name])
+        #         if can_run:
+        #             scheduler.run_actor(inport.owner)
+        #
+        # # collect results from output ports
+        # res = {port.name: port.pop_all() for port in self.outports}
+        # return res
 
     # def get_run_args(self):
     #     args = ()
-    #     kwargs = {}
-    #     kwargs['inports'] = {}
-    #     for inport in self.inports.values():
-    #         name = inport.name
-    #         kwargs['inports'][name]['value'] = inport.pop()
-    #         kwargs['inports'][name]['target'] = self._in_connections[inport.name]
-    #     kwargs['outports'] = self.outports
-    #     # TODO this does not seem right
-    #     kwargs['scheduler'] = self.scheduler
-    #
-    # @classmethod
-    # def run(cls, *args, **kwargs):
-    #     # pass input to target input ports
-    #     inports = kwargs['inports']
-    #     scheduler = kwargs['scheduler']
-    #     for inport in inports.values():
-    #         scheduler.put_value(inport['target'], inport['value'])
-    #     # TODO this does not work for an existing scheduler
-    #     scheduler.execute()
-    #
-    #     # run finished
-    #     res = {}
-    #     for outport in kwargs['outports'].values():
-    #         source = self._out_connections[outport.name]
-    #         if not source.isempty():
-    #             # TODO how/when flatten the resulting deque?
-    #             # aka how to deal with single/multiple output values
-    #             res[outport.name] = source.pop_all()
-    #
-    #     return res
+    #     kwargs = {'scheduler': self.scheduler}
+
+    def add_inport(self, inport):
+        # inport is an existing input port
+        self._inports[inport.name] = inport
+        # self._in_connections[inport.name] = inport
+
+
+    def add_outport(self, outport):
+        # outport is an existing output port
+        self._outports[outport.name] = outport
+        # self.outports.append(outport.name)
+        # self._out_connections[outport.name] = outport
+
+        # def get_run_args(self):
+        #     args = (self, )
+        #     kwargs = {}
+        #     direct_run = True
+        #     return args, kwargs, direct_run
+        #
+        # @classmethod
+        # def run(cls, self):
+        #     # pass input to target input ports
+        #     for inport in self.inports.values():
+        #         value = inport.pop()
+        #         target = self._in_connections[inport.name]
+        #         self.scheduler.put_value(target, value)
+        #     # TODO this does not work for an existing scheduler
+        #     self.scheduler.execute()
+        #
+        #     # run finished
+        #     res = {}
+        #     for outport in self.outports.values():
+        #         source = self._out_connections[outport.name]
+        #         if not source.isempty():
+        #             # TODO how/when flatten the resulting deque?
+        #             # aka how to deal with single/multiple output values
+        #             res[outport.name] = source.pop_all()
+        #
+        #     return res
+        #
+        #     # pass input to target input ports
+        #     inports = kwargs['inports']
+        #     for inport in inports.values():
+        #         scheduler.put_value(inport['target'], inport['value'])
+        #     # TODO this does not work for an existing scheduler
+        #     scheduler.execute()
+        #
+        #     # run finished
+        #     res = {}
+        #     for outport in kwargs['outports'].values():
+        #         source = self._out_connections[outport.name]
+        #         if not source.isempty():
+        #             # TODO how/when flatten the resulting deque?
+        #             # aka how to deal with single/multiple output values
+        #             res[outport.name] = source.pop_all()
+        #
+        #     return res
 
 
 class Workflow(Composite):

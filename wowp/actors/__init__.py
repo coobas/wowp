@@ -1,24 +1,36 @@
 from ..components import Actor
 import inspect
+import itertools
 
 
 class FuncActor(Actor):
 
     """Actor defined simply by a function
-    """
-    # TODO create a derived class instead of an instance
 
-    def __init__(self, func, outports=None, inports=None, name=None):
+    Args:
+        func (callable): The function to be called on actor execution
+        args (list): Fixed function positional arguments
+        kwargs(dict): Fixed function keyword arguments
+            args and kwargs behave as functools.partial args and keywords
+        outports: output port name(s)
+        inports: input port name(s)
+        name (str): actor name
+    """
+
+    def __init__(self, func, args=(), kwargs={}, outports=None, inports=None, name=None):
         if not name:
             name = func.__name__
         super(FuncActor, self).__init__(name=name)
-        # get function signature
         try:
+            # try to derive ports from function signature
             sig = inspect.signature(func)
             return_annotation = sig.return_annotation
             # derive ports from func signature
             if inports is None:
-                inports = (par.name for par in sig.parameters.values())
+                # filter out args (first len(args) arguments and kwargs)
+                inports = (par.name for par in
+                           itertools.islice(sig.parameters.values(), len(args), None)
+                           if par.name not in kwargs)
             if outports is None and return_annotation is not inspect.Signature.empty:
                 # if func has a return annotation, use it for outports names
                 outports = return_annotation
@@ -31,6 +43,8 @@ class FuncActor(Actor):
                 inports = (inports, )
         # save func as attribute
         self.func = func
+        self._func_args = args
+        self._func_kwargs = kwargs
         # setup inports
         for name in inports:
             self.inports.append(name)
@@ -45,6 +59,8 @@ class FuncActor(Actor):
     def get_run_args(self):
         args = tuple(port.pop() for port in self.inports)
         kwargs = {'func': self.func,
+                  'func_args': self._func_args,
+                  'func_kwargs': self._func_kwargs,
                   'outports': tuple(port.name for port in self.outports)}
         # kwargs['connected_ports'] = list((name for name, port in self.outports.items()
         #                                   if port.isconnected()))
@@ -53,7 +69,8 @@ class FuncActor(Actor):
 
     @classmethod
     def run(cls, *args, **kwargs):
-        func_res = kwargs['func'](*args)
+        args = kwargs['func_args'] + args
+        func_res = kwargs['func'](*args, **kwargs['func_kwargs'])
         outports = kwargs['outports']
 
         if len(outports) == 1:
@@ -63,6 +80,8 @@ class FuncActor(Actor):
         return res
 
     def __call__(self, *args, **kwargs):
+        args = self._func_args + args
+        kwargs.update(self._func_kwargs)
         return self.func(*args, **kwargs)
 
 

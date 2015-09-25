@@ -31,6 +31,38 @@ def test_FuncActor_call():
     assert func(x, y) == fa(x, y)
 
 
+def test_FuncActor_partial_args():
+    def func(x, y) -> ('a', 'b'):
+        return x + 1, y + 2
+    x, y = 2, 3.1
+
+    fa = FuncActor(func, args=(x, ))
+    fa.inports.y.put(y)
+
+    NaiveScheduler().run_actor(fa)
+
+    a, b = func(x, y)
+
+    assert(fa.outports.a.pop() == a)
+    assert(fa.outports.b.pop() == b)
+
+
+def test_FuncActor_partial_kwargs():
+    def func(x, y) -> ('a', 'b'):
+        return x + 1, y + 2
+    x, y = 2, 3.1
+
+    fa = FuncActor(func, kwargs={'y': y})
+    fa.inports.x.put(x)
+
+    NaiveScheduler().run_actor(fa)
+
+    a, b = func(x, y)
+
+    assert(fa.outports.a.pop() == a)
+    assert(fa.outports.b.pop() == b)
+
+
 def test_custom_actor_call():
 
     class StrActor(Actor):

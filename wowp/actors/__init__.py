@@ -66,66 +66,6 @@ class FuncActor(Actor):
         return self.func(*args, **kwargs)
 
 
-class GeneralizedFunctionActor(Actor):
-    """
-    Generalized function actor that supports argument binding.
-    """
-
-    def __init__(self, func, inport_args, bound_args = {}, outports = ["_"], name=None):
-        """
-        :param func: Any callable object
-        :param inport_args: mapping from inport names to func arguments (for identical mapping, use list/tuple)
-        :param bound_args: fixed arguments for func (argument name -> value)
-        :param outports: a list of outport names
-        :param name: name of the functor
-
-        The argument identifiers can be strings (for kwargs) and/or ints (for args).
-        """
-        if not name:
-            name = func.__name__    # If it has it
-        super(GeneralizedFunctionActor, self).__init__(name=name)
-        if not callable(func):
-            raise Exception("Not callable")
-
-        self.function = func
-
-        if isinstance(inport_args, list) or isinstance(inport_args, tuple):
-            inport_args = { k : k for k in inport_args }
-        self.inport_arguments = inport_args
-        for name in inport_args.keys():
-            self.inports.append(name)
-
-        self.bound_arguments = bound_args
-        for name in outports:
-            self.outports.append(name)
-
-    def get_run_args(self):
-        inport_args = { port.name : port.pop() for port in self.inports }
-        args = self, inport_args
-        kwargs = {}
-        return args, kwargs
-
-    def _run(self, inport_args):
-        call_args = { self.inport_arguments[key] : value for key, value in inport_args.items() }   # Map the inports to arguments
-        call_args.update(self.bound_arguments)
-
-        kwargs = { k : v for k, v in call_args.items() if isinstance(k, str) }
-        args_length = len(call_args) - len(kwargs)
-        args = [ call_args[i] for i in range(args_length) ]
-
-        return self.function(*args, **kwargs)
-
-    @classmethod
-    def run(cls, *args, **kwargs):
-        obj, inport_args = args
-        func_res = obj._run(inport_args)
-
-        if len(obj.outports) == 1:
-            func_res = (func_res,)
-        res = {name: value for name, value in zip((o.name for o in obj.outports), func_res)}
-        return res
-
-
 class Switch(Actor):
 
     """While loop actor

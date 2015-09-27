@@ -32,6 +32,7 @@ class _ActorRunner(object):
         if isinstance(actor, wowp.components.Composite):
             self.run_workflow(actor)
         else:
+            actor.scheduler = self
             args, kwargs = actor.get_run_args()
             result = actor.run(*args, **kwargs)
             # print("Result: ", result)
@@ -196,6 +197,7 @@ class IPyClusterScheduler(_ActorRunner):
 
     def run_actor(self, actor):
         # print("Run actor {}".format(actor))
+        actor.scheduler = self
         args, kwargs = actor.get_run_args()
         return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
 

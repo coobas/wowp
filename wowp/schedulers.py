@@ -52,16 +52,16 @@ class _ActorRunner(object):
 
     def run_workflow(self, workflow, **kwargs):
         inport_names = tuple(port.name for port in workflow.inports)
+        if workflow.scheduler is not None:
+            scheduler = workflow.scheduler
+        else:
+            scheduler = self
         for key, value in kwargs.items():
             if key not in inport_names:
                 raise ValueError('{} is not an inport name'.format(key))
             inport = workflow.inports[key]
             # put values to connected ports
             can_run = inport.put(kwargs[inport.name])
-            if workflow.scheduler is not None:
-                scheduler = workflow.scheduler
-            else:
-                scheduler = self
             if can_run:
                 scheduler.run_actor(inport.owner)
         # TODO can this be run inside self.execute itsef?

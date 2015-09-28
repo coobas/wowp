@@ -1,6 +1,9 @@
 '''WOWP -- A WOrkfloW Framework in Python
 '''
 
+__version__ = '0.0.2'
+__release__ = __version__ + '-alpha'
+
 import logging
 
 logger = logging.getLogger(__name__)

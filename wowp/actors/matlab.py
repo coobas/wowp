@@ -13,7 +13,6 @@ from warnings import warn
 
 
 class EngineManager(object):
-
     """Matlab engine with a shared pool"""
 
     _engine_pool = []
@@ -64,7 +63,6 @@ class EngineManager(object):
 
 
 class MatlabMethod(Actor):
-
     def __init__(self, method_name, inports=(), outports='result'):
         self.method_name = method_name
 

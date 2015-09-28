@@ -4,9 +4,8 @@ import nose
 
 
 def _run_workflow(scheduler, wf_scheduler):
-
     if (isinstance(scheduler, ThreadedScheduler) or
-    isinstance(wf_scheduler, ThreadedScheduler)):
+            isinstance(wf_scheduler, ThreadedScheduler)):
         # skip temporarily
         raise nose.SkipTest
 
@@ -26,9 +25,8 @@ def _run_workflow(scheduler, wf_scheduler):
 
 
 def _call_workflow(scheduler, wf_scheduler):
-
     if (isinstance(scheduler, ThreadedScheduler) or
-    isinstance(wf_scheduler, ThreadedScheduler)):
+            isinstance(wf_scheduler, ThreadedScheduler)):
         # skip temporarily
         raise nose.SkipTest
 
@@ -51,8 +49,8 @@ def test_all_schedulers():
                       LinearizedScheduler(),
                       NaiveScheduler()):
         for wf_scheduler in (ThreadedScheduler(max_threads=8),
-                          LinearizedScheduler(),
-                          NaiveScheduler()):
+                             LinearizedScheduler(),
+                             NaiveScheduler()):
             for case in (_call_workflow,
                          _run_workflow):
                 yield case, scheduler, wf_scheduler

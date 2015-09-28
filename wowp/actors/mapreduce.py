@@ -1,8 +1,7 @@
-from ..components import  Actor
+from ..components import Actor
 
 
 class Concat(Actor):
-
     def __init__(self, n_ports, name='concat'):
         super().__init__(name=name)
         for i in range(n_ports):
@@ -33,7 +32,6 @@ class Concat(Actor):
 
 
 class Map(Actor):
-
     """
     Maps a given actor on input token elements.
 

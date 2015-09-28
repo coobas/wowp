@@ -8,7 +8,7 @@ from string import ascii_uppercase
 def test_map_run():
     func = lambda x: x * 2
     inp = range(5)
-    map_act = Map(FuncActor, args=(func, ), scheduler=LinearizedScheduler())
+    map_act = Map(FuncActor, args=(func,), scheduler=LinearizedScheduler())
     map_act.inports.inp.put(inp)
     result = map_act.run()
     assert all(a == b for a, b in zip_longest(result, map(func, inp)))

@@ -8,6 +8,7 @@ def test_two_connected():
 
     --func1(.)--func2(.)--
     """
+
     def func1(x) -> ('a'):
         return x * 2
 
@@ -35,6 +36,7 @@ def test_two_to_one_connected():
     --func1(.)--+
 
     """
+
     def func1(x) -> ('a'):
         return x * 2
 
@@ -66,6 +68,7 @@ def test_three_in_line():
 
     --func(.)--func(.)--func(.)--
     """
+
     def func(x) -> ('x'):
         return x * 2
 

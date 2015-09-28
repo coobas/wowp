@@ -2,6 +2,7 @@ from nose.tools import istest, nottest
 
 try:
     from wowp.actors.matlab import MatlabMethod
+
     matlab_test = istest
 except Exception:
     matlab_test = nottest

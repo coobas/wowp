@@ -31,12 +31,13 @@ def _run_tree_512_test(scheduler):
     scheduler.put_value(first.inports['a'], 1)
     scheduler.execute()
 
-    assert(2 ** power == last.outports['a'].pop())
+    assert (2 ** power == last.outports['a'].pop())
 
 
 def orig(x) -> ('x'):
     # print("In act1:", x)
     return x
+
 
 def app_fn(x) -> ('x'):
     import random
@@ -47,8 +48,8 @@ def app_fn(x) -> ('x'):
     sleep(s)
     return x
 
-def _run_linearity_test(scheduler, size=100, ntimes=1):
 
+def _run_linearity_test(scheduler, size=100, ntimes=1):
     max_ = size
 
     original_sequence = list(range(max_))

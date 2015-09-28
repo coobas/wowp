@@ -1,6 +1,5 @@
 from wowp.actors import FuncActor, Switch
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
-
 import nose
 
 
@@ -12,6 +11,7 @@ def test_LinearizedScheduler_loop1000():
 
     def func(x) -> ('x'):
         return x + 1
+
     fa = FuncActor(func)
     lw = Switch("a_loop", condition)
 
@@ -22,7 +22,7 @@ def test_LinearizedScheduler_loop1000():
     scheduler.execute()
 
     result = lw.outports['final'].pop()
-    assert(result == 1000)
+    assert (result == 1000)
 
 
 def _run_tree_512_test(scheduler):
@@ -54,7 +54,7 @@ def _run_tree_512_test(scheduler):
     scheduler.put_value(first.inports['a'], 1)
     scheduler.execute()
 
-    assert(2 ** power == last.outports['a'].pop())
+    assert (2 ** power == last.outports['a'].pop())
 
 
 def test_all_schedulers():
@@ -77,7 +77,7 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
         jobs_executed += 1
         return x
 
-    branch_count = 40    # times 2
+    branch_count = 40  # times 2
     branch_length = 10
     thread_count = 8
 

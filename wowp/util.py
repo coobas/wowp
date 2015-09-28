@@ -1,7 +1,6 @@
 from collections import OrderedDict as _OrderedDict
 import warnings
 
-
 try:
     from threading import get_ident as _get_ident
 except ImportError:
@@ -9,7 +8,6 @@ except ImportError:
 
 
 class ListDict(_OrderedDict):
-
     """Ordered dict with insert methods
 
     From https://gist.github.com/jaredks/6276032
@@ -36,7 +34,9 @@ class ListDict(_OrderedDict):
             if key in self:
                 del self[key]
             link_next = link_prev[1]
-            self._OrderedDict__map[key] = link_prev[1] = link_next[0] = [link_prev, link_next, key]
+            self._OrderedDict__map[key] = link_prev[1] = link_next[0] = [
+                link_prev, link_next, key
+            ]
         dict.__setitem__(self, key, value)
 
     def insert_after(self, existing_key, key_value):
@@ -54,7 +54,8 @@ def deprecated(func):
     def new_func(*args, **kwargs):
         warnings.simplefilter('always', DeprecationWarning)  # turn off filter
         warnings.warn("Call to deprecated function {}.".format(func.__name__),
-                      category=DeprecationWarning, stacklevel=2)
+                      category=DeprecationWarning,
+                      stacklevel=2)
         warnings.simplefilter('default', DeprecationWarning)  # reset filter
         return func(*args, **kwargs)
 

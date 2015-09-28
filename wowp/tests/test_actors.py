@@ -7,6 +7,7 @@ import nose
 def test_FuncActor_return_annotation():
     def func(x, y) -> ('a', 'b'):
         return x + 1, y + 2
+
     x, y = 2, 3.1
 
     fa = FuncActor(func)
@@ -17,13 +18,14 @@ def test_FuncActor_return_annotation():
 
     a, b = func(x, y)
 
-    assert(fa.outports.a.pop() == a)
-    assert(fa.outports.b.pop() == b)
+    assert (fa.outports.a.pop() == a)
+    assert (fa.outports.b.pop() == b)
 
 
 def test_FuncActor_call():
     def func(x, y) -> ('a', 'b'):
         return x + 1, y + 2
+
     x, y = 2, 3.1
 
     fa = FuncActor(func)
@@ -34,22 +36,24 @@ def test_FuncActor_call():
 def test_FuncActor_partial_args():
     def func(x, y) -> ('a', 'b'):
         return x + 1, y + 2
+
     x, y = 2, 3.1
 
-    fa = FuncActor(func, args=(x, ))
+    fa = FuncActor(func, args=(x,))
     fa.inports.y.put(y)
 
     NaiveScheduler().run_actor(fa)
 
     a, b = func(x, y)
 
-    assert(fa.outports.a.pop() == a)
-    assert(fa.outports.b.pop() == b)
+    assert (fa.outports.a.pop() == a)
+    assert (fa.outports.b.pop() == b)
 
 
 def test_FuncActor_partial_kwargs():
     def func(x, y) -> ('a', 'b'):
         return x + 1, y + 2
+
     x, y = 2, 3.1
 
     fa = FuncActor(func, kwargs={'y': y})
@@ -59,14 +63,12 @@ def test_FuncActor_partial_kwargs():
 
     a, b = func(x, y)
 
-    assert(fa.outports.a.pop() == a)
-    assert(fa.outports.b.pop() == b)
+    assert (fa.outports.a.pop() == a)
+    assert (fa.outports.b.pop() == b)
 
 
 def test_custom_actor_call():
-
     class StrActor(Actor):
-
         def __init__(self, *args, **kwargs):
             super(StrActor, self).__init__(*args, **kwargs)
             # specify input port
@@ -76,7 +78,7 @@ def test_custom_actor_call():
 
         def get_run_args(self):
             # get input value(s) using .pop()
-            args = (self.inports['input'].pop(), )
+            args = (self.inports['input'].pop(),)
             kwargs = {}
             return args, kwargs
 
@@ -85,7 +87,6 @@ def test_custom_actor_call():
             # return a dictionary with port names as keys
             res = {'output': str(value)}
             return res
-
 
     actor = StrActor(name='str_actor')
     value = 123
@@ -100,6 +101,7 @@ def test_LoopWhileActor():
 
     def func(x) -> ('x'):
         return x + 1
+
     fa = FuncActor(func)
     lw = Switch("a_loop", condition)
 
@@ -112,7 +114,7 @@ def test_LoopWhileActor():
 
     result = lw.outports['final'].pop()
 
-    assert(result == 10)
+    assert (result == 10)
 
 
 def test_LoopWhileActorWithInner():
@@ -121,6 +123,7 @@ def test_LoopWhileActorWithInner():
 
     def func(x) -> ('x'):
         return x + 1
+
     fa = FuncActor(func)
     lw = Switch("a_loop", condition, inner_actor=fa)
 
@@ -128,7 +131,7 @@ def test_LoopWhileActorWithInner():
 
     NaiveScheduler().run_actor(lw)
     result = lw.outports['final'].pop()
-    assert(result == 10)
+    assert (result == 10)
 
 
 def test_Shellrunner():
@@ -149,9 +152,10 @@ def test_Shellrunner():
     print("Std out: ", stdout.strip())
     print("Std err: ", stderr.strip())
 
-    assert(rvalue == 0)
-    assert(stdout.strip() == "test")
-    assert(stderr.strip() == "")
+    assert (rvalue == 0)
+    assert (stdout.strip() == "test")
+    assert (stderr.strip() == "")
+
 
 if __name__ == '__main__':
     nose.run(argv=[__file__, '-vv'])

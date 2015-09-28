@@ -4,7 +4,6 @@ import itertools
 
 
 class FuncActor(Actor):
-
     """Actor defined simply by a function
 
     Args:
@@ -38,9 +37,9 @@ class FuncActor(Actor):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('inp', )
+                inports = ('inp',)
             elif isinstance(inports, str):
-                inports = (inports, )
+                inports = (inports,)
         # save func as attribute
         self.func = func
         self._func_args = args
@@ -50,9 +49,9 @@ class FuncActor(Actor):
             self.inports.append(name)
         # setup outports
         if outports is None:
-            outports = ('out', )
+            outports = ('out',)
         elif isinstance(outports, str):
-            outports = (outports, )
+            outports = (outports,)
         for name in outports:
             self.outports.append(name)
 
@@ -74,7 +73,7 @@ class FuncActor(Actor):
         outports = kwargs['outports']
 
         if len(outports) == 1:
-            func_res = (func_res, )
+            func_res = (func_res,)
         # iterate over ports and return values
         res = {name: value for name, value in zip(outports, func_res)}
         return res
@@ -86,7 +85,6 @@ class FuncActor(Actor):
 
 
 class Switch(Actor):
-
     """While loop actor
     """
 
@@ -132,7 +130,6 @@ class Switch(Actor):
 
 
 class ShellRunner(Actor):
-
     """An actor executing external command."""
 
     def __init__(self, base_command, name=None, binary=False, shell=False):
@@ -191,7 +188,6 @@ class ShellRunner(Actor):
 
 
 class Sink(Actor):
-
     """Dumps everything
     """
 
@@ -206,4 +202,3 @@ class Sink(Actor):
     @staticmethod
     def run(*args, **kwargs):
         pass
-

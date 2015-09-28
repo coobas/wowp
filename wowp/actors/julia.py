@@ -1,5 +1,4 @@
 from . import Actor
-
 from julia import Julia, JuliaError
 
 

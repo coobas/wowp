@@ -2,7 +2,6 @@ from . import Actor
 
 
 class GeneratorActor(Actor):
-
     class PseudoDict(object):
         def __init__(self, iterator):
             self.iterator = iterator
@@ -35,7 +34,6 @@ class LineReader(GeneratorActor):
 
 
 class IteratorActor(GeneratorActor):
-
     def __init__(self, name="iterator", inport_name="collection", outport_name="item"):
         Actor.__init__(self, name=name)
         self.inports.append(inport_name)
@@ -50,7 +48,6 @@ class IteratorActor(GeneratorActor):
 
 
 class Splitter(Actor):
-
     def __init__(self, name="splitter", inport_name="in", multiplicity=2):
         import itertools
         Actor.__init__(self, name=name)
@@ -58,10 +55,10 @@ class Splitter(Actor):
         self.multiplicity = multiplicity
 
         self.inports.append(inport_name)
-        for i in range(1, multiplicity+1):
+        for i in range(1, multiplicity + 1):
             self.outports.append("%s_%d" % (inport_name, i))
 
-        self._outports_cycle = itertools.cycle(range(1, multiplicity+1))
+        self._outports_cycle = itertools.cycle(range(1, multiplicity + 1))
 
     def run(self):
         value = self.inports[self.inport_name].pop()
@@ -70,5 +67,5 @@ class Splitter(Actor):
         return {outport: value}
 
 
-# TODO: Add SequentialMerger
-# TODO: Add RandomMerger
+        # TODO: Add SequentialMerger
+        # TODO: Add RandomMerger

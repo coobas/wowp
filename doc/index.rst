@@ -51,6 +51,8 @@ Tutorials
    Tutorial/graph_drawing
    Tutorial/julia
    Tutorial/Matlab
+   Tutorial/Custom actors
+   Tutorial/IPython.parallel scheduler
    Tutorial/Generator actor
 
 

@@ -1,7 +1,8 @@
 import tempfile
 import os
 
-def build_graph(actor): 
+
+def build_graph(actor):
     """Create graph with all actors + ports as nodes.
     
     It walks over all connections.
@@ -19,15 +20,14 @@ def build_graph(actor):
     ports = []
     graph = graphviz.Digraph()
 
-    
     def _get_name(obj):
         return str(hash(obj))
-    
+
     def _add_node(actor):
-        attrs = {"fontsize" : "12"}
+        attrs = {"fontsize": "12"}
         graph.node(_get_name(actor), label=actor.name, shape="box", **attrs)
         actors.append(actor)
-    
+
     def _walk_node(actor):
         name = _get_name(actor)
         if not actor in actors:
@@ -36,8 +36,8 @@ def build_graph(actor):
             if port not in ports:
                 attrs = {}
                 if not port.connections:
-                    attrs["style"]="filled"
-                    attrs["color"]="#ff0000"                
+                    attrs["style"] = "filled"
+                    attrs["color"] = "#ff0000"
                 graph.node(_get_name(port), label=port.name, **attrs)
                 graph.edge(name, _get_name(port))
                 ports.append(port)
@@ -50,23 +50,25 @@ def build_graph(actor):
             if port not in ports:
                 attrs = {}
                 if not port.connections:
-                    attrs["style"]="filled"
-                    attrs["color"]="#ffff00"
+                    attrs["style"] = "filled"
+                    attrs["color"] = "#ffff00"
                 graph.node(_get_name(port), label=port.name, **attrs)
                 graph.edge(_get_name(port), name, )
                 ports.append(port)
             for other in port.connections:
                 if (other, port) not in edges:
                     _walk_node(other.owner)
+
     _walk_node(actor)
     return graph
+
 
 def ipy_show(actor):
     """Display graph in IPython.
 
     """
     graph = build_graph(actor)
-    graph.format="png"
+    graph.format = "png"
 
     from IPython.display import Image
     d = tempfile.mkdtemp()

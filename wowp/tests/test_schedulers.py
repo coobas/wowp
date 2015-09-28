@@ -1,6 +1,5 @@
-from wowp.actors import FuncActor, LoopWhile
+from wowp.actors import FuncActor, Switch
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
-
 import nose
 
 
@@ -12,8 +11,9 @@ def test_LinearizedScheduler_loop1000():
 
     def func(x) -> ('x'):
         return x + 1
+
     fa = FuncActor(func)
-    lw = LoopWhile("a_loop", condition)
+    lw = Switch("a_loop", condition)
 
     fa.inports['x'] += lw.outports['loop_out']
     lw.inports['loop_in'] += fa.outports['x']
@@ -22,7 +22,7 @@ def test_LinearizedScheduler_loop1000():
     scheduler.execute()
 
     result = lw.outports['final'].pop()
-    assert(result == 1000)
+    assert (result == 1000)
 
 
 def _run_tree_512_test(scheduler):
@@ -54,17 +54,15 @@ def _run_tree_512_test(scheduler):
     scheduler.put_value(first.inports['a'], 1)
     scheduler.execute()
 
-    assert(2 ** power == last.outports['a'].pop())
+    assert (2 ** power == last.outports['a'].pop())
 
 
-def test_ThreadedScheduler_tree512():
-    scheduler = ThreadedScheduler(max_threads=8)
-    _run_tree_512_test(scheduler)
-
-
-def test_LinearizedScheduler_tree512():
-    scheduler = LinearizedScheduler()
-    _run_tree_512_test(scheduler)
+def test_all_schedulers():
+    for scheduler in (ThreadedScheduler(max_threads=8),
+                      LinearizedScheduler()):
+        for case in (_run_tree_512_test,
+                     _run_linearity_test):
+            yield case, scheduler
 
 
 def test_ThrededScheduler_creates_threads_and_executes_all():
@@ -79,7 +77,7 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
         jobs_executed += 1
         return x
 
-    branch_count = 40    # times 2
+    branch_count = 40  # times 2
     branch_length = 10
     thread_count = 8
 
@@ -101,17 +99,6 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
     assert thread_count >= len(thread_ids)
     assert 1 < len(thread_ids)
     assert jobs_executed == branch_count * branch_length
-
-
-def test_ThreadedScheduler_linearity():
-    thread_count = 4
-    scheduler = ThreadedScheduler(max_threads=thread_count)
-    _run_linearity_test(scheduler)
-
-
-def test_LinearizedScheduler_linearity():
-    scheduler = LinearizedScheduler()
-    _run_linearity_test(scheduler)
 
 
 def _run_linearity_test(scheduler):

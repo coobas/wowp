@@ -2,18 +2,15 @@ from .util import ListDict, deprecated
 from collections import deque
 from . import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
-
 import networkx as nx
 import functools
 import keyword
 from warnings import warn
 
-
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
 
 
 class NoValue(object):
-
     """A unique no value object
 
     Note that we cannot use None as this can be used by users
@@ -30,19 +27,36 @@ def has_value(value):
 
 
 class Component(object):
-
     """Base WOWP component class
     """
 
-    def __init__(self, name=None, scheduler=NaiveScheduler()):
+    def __init__(self, name=None):
         if name is None:
             name = self.__class__.__name__.lower()
+        assert is_valid_componenet_name(name)
         self.name = name
-        self.scheduler = scheduler
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def run(self):
+    def get_run_args(self):
+        """
+        Prepare arguments (args, kwargs) for the run method
+
+        The default behaviour is to put values from
+        all connected input ports to kwargs.
+
+        :return: args, kwargs
+        :rtype: tuple
+        """
+        args = ()
+        kwargs = {
+            port.name: port.pop()
+            for port in self.inports if port.isconnected()
+            }
+        return args, kwargs
+
+    @classmethod
+    def run(cls, *args, **kwargs):
         """This is a virtual method
         """
         raise NotImplementedError('Calling a virtual method')
@@ -87,42 +101,42 @@ class Component(object):
         """
         return build_nx_graph(self)
 
+    # TODO create workflow (composite) from actor's connections
 
-# TODO create workflow (composite) from actor's connections
-    def get_workflow(self, name=None, scheduler=None):
+    def get_workflow(self, name=None):
         '''Creates a workflow form actor's connections
         '''
-
-        if scheduler is None:
-            scheduler = self.scheduler.copy()
 
         graph = self.graph
         leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
         leaves_in = [n for n, d in graph.in_degree_iter() if d == 0]
 
-        workflow = Workflow(name=name, scheduler=scheduler)
+        workflow = Workflow(name=name)
 
         for node in (graph.node[n] for n in leaves_in):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+                warn('Component without any input: {} ({})'.format(
+                    node['ref'].name, node['ref']))
             elif isinstance(node['ref'], InPort):
                 workflow.add_inport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref']))
+                raise Exception('{} cannot be an input port'.format(node['ref'
+                                                                    ]))
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+                warn('Component without any input: {} ({})'.format(
+                    node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref']))
+                raise Exception('{} cannot be an input port'.format(node['ref'
+                                                                    ]))
 
         return workflow
 
 
 class Actor(Component):
-
     """Actor class
     """
 
@@ -139,81 +153,56 @@ class Actor(Component):
             if inport.name in kwargs:
                 inport.buffer.appendleft(kwargs[inport.name])
         # run the actor
-        res = self.run()
+        args, kwargs = self.get_run_args()
+        res = self.run(*args, **kwargs)
         return res
 
 
 class Composite(Component):
-
     """Composite = a group of actors
     """
 
-    def __init__(self, name=None, scheduler=NaiveScheduler()):
-        super().__init__(name=name, scheduler=scheduler)
-        self._in_connections = {}
-        self._out_connections = {}
+    def __init__(self, name=None, scheduler=None):
+        super().__init__(name=name)
+        self.scheduler = scheduler
 
-    def __call__(self, scheduler_=None, **kwargs):
+    def __call__(self, scheduler=None, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
 
-        :param scheduler_: execution scheduler (defaul
-        :param kwargs: input ports values
-        :return: output port(s) value(s)
-        :rtype: dict for multiple ports
+        Args:
+            scheduler: execution scheduler (default LinearizedScheduler)
+            kwargs: input ports values
+
+        Returns:
+            output port(s) value(s)
         """
 
-        if scheduler_ is None:
-            scheduler_ = LinearizedScheduler()
-        self.scheduler = scheduler_
+        if self.scheduler is not None:
+            # prefer self.scheduler
+            scheduler = self.scheduler
+        if scheduler is None:
+            # default scheduler for __call__
+            scheduler = LinearizedScheduler()
 
-        for inport in self.inports:
-            if inport.name in kwargs:
-                inport.put(kwargs[inport.name])
-
-        res = self.run()
+        scheduler.run_workflow(self, **kwargs)
+        res = {port.name: port.pop_all() for port in self.outports}
         return res
 
     def add_inport(self, inport):
-        # inport is an existing input port
-        self.inports.append(inport.name)
-        self._in_connections[inport.name] = inport
+        self._inports[inport.name] = inport
 
     def add_outport(self, outport):
-        # outport is an existing output port
-        self.outports.append(outport.name)
-        self._out_connections[outport.name] = outport
-
-    def run(self):
-        # pass input to target input ports
-        for inport in self.inports.values():
-            value = inport.pop()
-            target = self._in_connections[inport.name]
-            self.scheduler.put_value(target, value)
-        # TODO this does not work for an existing scheduler
-        self.scheduler.execute()
-
-        # run finished
-        res = {}
-        for outport in self.outports.values():
-            source = self._out_connections[outport.name]
-            if not source.isempty():
-                # TODO how/when flatten the resulting deque?
-                # aka how to deal with single/multiple output values
-                res[outport.name] = source.pop_all()
-
-        return res
+        self._outports[outport.name] = outport
 
 
 class Workflow(Composite):
-
     """Workflow class
     """
     pass
 
 
 class Ports(object):
-
     """Port collection
     """
 
@@ -236,6 +225,9 @@ class Ports(object):
     def __iter__(self):
         # TODO this might not be intuitive
         return iter(self._ports.values())
+
+    def items(self):
+        return self._ports.items()
 
     def values(self):
         return self._ports.values()
@@ -263,8 +255,9 @@ class Ports(object):
     def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))
-        self._ports.insert_after(existing_port_name,
-                                 (new_port_name, self.__new_port(new_port_name)))
+        self._ports.insert_after(
+            existing_port_name,
+            (new_port_name, self.__new_port(new_port_name)))
 
     def append(self, new_port_name, replace_existing=False, **kwargs):
         if not replace_existing and new_port_name in self._ports:
@@ -276,11 +269,11 @@ class Ports(object):
 
 
 class Port(object):
-
     """Represents a single input/output actor port
     """
 
     def __init__(self, name, owner, persistent=False, default=NoValue):
+        assert is_valid_port_name(name)
         self.name = name
         self.owner = owner
         self.persistent = persistent
@@ -322,7 +315,8 @@ class Port(object):
             # TODO this creates a circular reference - is it a good idea?
             other._connections.append(self)
         else:
-            logger.warn('connecting an already connected actor {}'.format(other))
+            logger.warn('connecting an already connected actor {}'.format(
+                other))
 
     @deprecated
     def __bool__(self):
@@ -333,10 +327,14 @@ class Port(object):
     def isempty(self):
         """True if the port buffer is empty
         """
-        if self.buffer or has_value(self._default) or (self.persistent and has_value(self._last_value)):
+        if self.buffer or has_value(self._default) or (
+                    self.persistent and has_value(self._last_value)):
             return False
         else:
             return True
+
+    def isconnected(self):
+        return bool(self._connections)
 
     def disconnect(self, other):
         if other not in self._connections:
@@ -375,7 +373,6 @@ class Port(object):
 
 
 class OutPort(Port):
-
     """A single, named output port
     """
 
@@ -388,7 +385,6 @@ class OutPort(Port):
 
 
 class InPort(Port):
-
     """A single, named input port
     """
 
@@ -412,13 +408,20 @@ class InPort(Port):
         return self.owner.can_run()
 
 
-def valid_name(name):
-    """Validate name (for actors, ports etc.)
+def is_valid_port_name(name):
+    """Validate port name
     """
     if name.isidentifier() and not keyword.iskeyword(name):
         return True
     else:
         return False
+
+
+def is_valid_componenet_name(name):
+    """Validate actor name
+    """
+    # so far no restrictions
+    return True
 
 
 def build_nx_graph(actor):
@@ -499,9 +502,14 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
     else:
         raise ValueError('{} layout not supported'.format(layout))
     # get colors and labels
-    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()]
+    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()
+              ]
     shapes = [graph.node[n].get('shape', 'o') for n in graph.nodes_iter()]
     labels = {n: graph.node[n].get('label', '') for n in graph.nodes_iter()}
     pos = lfunc(graph)
-    nx.draw_networkx(graph, pos=pos, with_labels=with_labels, labels=labels,
-                     node_color=colors, node_size=node_size)
+    nx.draw_networkx(graph,
+                     pos=pos,
+                     with_labels=with_labels,
+                     labels=labels,
+                     node_color=colors,
+                     node_size=node_size)

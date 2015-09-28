@@ -2,18 +2,15 @@ from .util import ListDict, deprecated
 from collections import deque
 from . import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
-
 import networkx as nx
 import functools
 import keyword
 from warnings import warn
 
-
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
 
 
 class NoValue(object):
-
     """A unique no value object
 
     Note that we cannot use None as this can be used by users
@@ -30,7 +27,6 @@ def has_value(value):
 
 
 class Component(object):
-
     """Base WOWP component class
     """
 
@@ -53,7 +49,10 @@ class Component(object):
         :rtype: tuple
         """
         args = ()
-        kwargs = {port.name: port.pop() for port in self.inports if port.isconnected()}
+        kwargs = {
+            port.name: port.pop()
+            for port in self.inports if port.isconnected()
+            }
         return args, kwargs
 
     @classmethod
@@ -102,8 +101,8 @@ class Component(object):
         """
         return build_nx_graph(self)
 
-
     # TODO create workflow (composite) from actor's connections
+
     def get_workflow(self, name=None):
         '''Creates a workflow form actor's connections
         '''
@@ -116,25 +115,28 @@ class Component(object):
 
         for node in (graph.node[n] for n in leaves_in):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+                warn('Component without any input: {} ({})'.format(
+                    node['ref'].name, node['ref']))
             elif isinstance(node['ref'], InPort):
                 workflow.add_inport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref']))
+                raise Exception('{} cannot be an input port'.format(node['ref'
+                                                                    ]))
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(node['ref'].name, node['ref']))
+                warn('Component without any input: {} ({})'.format(
+                    node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref']))
+                raise Exception('{} cannot be an input port'.format(node['ref'
+                                                                    ]))
 
         return workflow
 
 
 class Actor(Component):
-
     """Actor class
     """
 
@@ -157,7 +159,6 @@ class Actor(Component):
 
 
 class Composite(Component):
-
     """Composite = a group of actors
     """
 
@@ -169,10 +170,12 @@ class Composite(Component):
         """
         Run the component with input ports filled from keyword arguments.
 
-        :param scheduler: execution scheduler (default LinearizedScheduler)
-        :param kwargs: input ports values
-        :return: output port(s) value(s)
-        :rtype: dict for multiple ports
+        Args:
+            scheduler: execution scheduler (default LinearizedScheduler)
+            kwargs: input ports values
+
+        Returns:
+            output port(s) value(s)
         """
 
         if self.scheduler is not None:
@@ -182,25 +185,24 @@ class Composite(Component):
             # default scheduler for __call__
             scheduler = LinearizedScheduler()
 
-        return scheduler.run_workflow(self, **kwargs)
+        scheduler.run_workflow(self, **kwargs)
+        res = {port.name: port.pop_all() for port in self.outports}
+        return res
 
     def add_inport(self, inport):
         self._inports[inport.name] = inport
-
 
     def add_outport(self, outport):
         self._outports[outport.name] = outport
 
 
 class Workflow(Composite):
-
     """Workflow class
     """
     pass
 
 
 class Ports(object):
-
     """Port collection
     """
 
@@ -253,8 +255,9 @@ class Ports(object):
     def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))
-        self._ports.insert_after(existing_port_name,
-                                 (new_port_name, self.__new_port(new_port_name)))
+        self._ports.insert_after(
+            existing_port_name,
+            (new_port_name, self.__new_port(new_port_name)))
 
     def append(self, new_port_name, replace_existing=False, **kwargs):
         if not replace_existing and new_port_name in self._ports:
@@ -266,7 +269,6 @@ class Ports(object):
 
 
 class Port(object):
-
     """Represents a single input/output actor port
     """
 
@@ -313,7 +315,8 @@ class Port(object):
             # TODO this creates a circular reference - is it a good idea?
             other._connections.append(self)
         else:
-            logger.warn('connecting an already connected actor {}'.format(other))
+            logger.warn('connecting an already connected actor {}'.format(
+                other))
 
     @deprecated
     def __bool__(self):
@@ -324,7 +327,8 @@ class Port(object):
     def isempty(self):
         """True if the port buffer is empty
         """
-        if self.buffer or has_value(self._default) or (self.persistent and has_value(self._last_value)):
+        if self.buffer or has_value(self._default) or (
+                    self.persistent and has_value(self._last_value)):
             return False
         else:
             return True
@@ -369,7 +373,6 @@ class Port(object):
 
 
 class OutPort(Port):
-
     """A single, named output port
     """
 
@@ -382,7 +385,6 @@ class OutPort(Port):
 
 
 class InPort(Port):
-
     """A single, named input port
     """
 
@@ -413,6 +415,7 @@ def is_valid_port_name(name):
         return True
     else:
         return False
+
 
 def is_valid_componenet_name(name):
     """Validate actor name
@@ -499,9 +502,14 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
     else:
         raise ValueError('{} layout not supported'.format(layout))
     # get colors and labels
-    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()]
+    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()
+              ]
     shapes = [graph.node[n].get('shape', 'o') for n in graph.nodes_iter()]
     labels = {n: graph.node[n].get('label', '') for n in graph.nodes_iter()}
     pos = lfunc(graph)
-    nx.draw_networkx(graph, pos=pos, with_labels=with_labels, labels=labels,
-                     node_color=colors, node_size=node_size)
+    nx.draw_networkx(graph,
+                     pos=pos,
+                     with_labels=with_labels,
+                     labels=labels,
+                     node_color=colors,
+                     node_size=node_size)

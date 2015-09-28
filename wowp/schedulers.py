@@ -5,7 +5,6 @@ import wowp.components
 
 
 class _ActorRunner(object):
-
     """Base class for objects that run actors and process their results.
 
     It is ok, if the runner is a scheduler at the same time. The separation
@@ -62,19 +61,12 @@ class _ActorRunner(object):
                 raise ValueError('{} is not an inport name'.format(key))
             inport = workflow.inports[key]
             # put values to connected ports
-            can_run = inport.put(kwargs[inport.name])
-            if can_run:
-                scheduler.run_actor(inport.owner)
+            scheduler.put_value(inport, kwargs[inport.name])
         # TODO can this be run inside self.execute itsef?
         scheduler.execute()
 
-        # collect results from output ports
-        res = {port.name: port.pop_all() for port in workflow.outports}
-        return res
-
 
 class NaiveScheduler(_ActorRunner):
-
     """Scheduler that directly calls connected actors.
 
     Problem: recursion quickly ends in full call stack.
@@ -93,7 +85,6 @@ class NaiveScheduler(_ActorRunner):
 
 
 class LinearizedScheduler(_ActorRunner):
-
     """Scheduler that stacks all inputs in a queue and executes them in FIFO order."""
 
     def __init__(self):
@@ -114,7 +105,6 @@ class LinearizedScheduler(_ActorRunner):
 
 
 class IPyClusterScheduler(_ActorRunner):
-
     """
     Scheduler using IPython Cluster.
     """
@@ -161,15 +151,17 @@ class IPyClusterScheduler(_ActorRunner):
                     # empty results don't need any processing
                     out_names = actor.outports.keys()
                     if not hasattr(result, 'items'):
-                        raise ValueError('The execute method must return '
-                                         'a dict-like object with items method')
+                        raise ValueError(
+                            'The execute method must return '
+                            'a dict-like object with items method')
                     for name, value in result.items():
                         if name in out_names:
                             outport = actor.outports[name]
                             outport.put(value)
                             self.on_outport_put_value(outport)
                         else:
-                            raise ValueError("{} not in output ports".format(name))
+                            raise ValueError("{} not in output ports".format(
+                                name))
 
             else:
                 pending[actor] = job
@@ -203,7 +195,6 @@ class IPyClusterScheduler(_ActorRunner):
 
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):
-
     """Thread object that executes run after run of the ThreadedScheduler actors.
     """
 
@@ -233,7 +224,7 @@ class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):
                 pass
                 # print(self.inner_id, "Nothing to do")
                 sleep(0.02)
-        # print(self.inner_id, "End")
+                # print(self.inner_id, "End")
 
     def put_value(self, in_port, value):
         # print(self.inner_id, " worker put ", value)
@@ -246,7 +237,6 @@ class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):
 
 
 class ThreadedScheduler(object):
-
     def __init__(self, max_threads=2):
         self.max_threads = max_threads
         self.threads = []
@@ -270,7 +260,7 @@ class ThreadedScheduler(object):
                 return None
 
     def put_value(self, in_port, value):
-        with self.state_mutex:     # Probably not necessary
+        with self.state_mutex:  # Probably not necessary
             # print("put ", value, ", in queue: ", len(self.queue))
             self.execution_queue.append((in_port, value))
 
@@ -285,7 +275,7 @@ class ThreadedScheduler(object):
                 self.finish_all_threads()
 
     def execute(self):
-        with self.state_mutex:     # Probably not necessary
+        with self.state_mutex:  # Probably not necessary
             for i in range(self.max_threads):
                 thread = ThreadedSchedulerWorker(self, i)
                 self.threads.append(thread)

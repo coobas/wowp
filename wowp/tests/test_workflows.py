@@ -20,7 +20,8 @@ def _run_workflow(scheduler, wf_scheduler):
     wf.scheduler = wf_scheduler
 
     x = math.pi / 2
-    res = scheduler.run_workflow(wf, inp=x)
+    scheduler.run_workflow(wf, inp=x)
+    res = {port.name: port.pop_all() for port in wf.outports}
     assert res['out'].pop() == math.asin(math.sin(x))
 
 

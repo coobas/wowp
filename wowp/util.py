@@ -20,11 +20,11 @@ class ListDict(_OrderedDict):
             self.__insertions_running = {}
         super(ListDict, self).__init__(*args, **kwds)
 
-    def __setitem__(self, key, value, dict_setitem=dict.__setitem__):
+    def __setitem__(self, key, value):
         if _get_ident() in self.__insertions_running:
             self.__insertions_running[_get_ident()] = key, value
         else:
-            super(ListDict, self).__setitem__(key, value, dict_setitem)
+            super(ListDict, self).__setitem__(key, value)
 
     def __insertion(self, link_prev, key_value):
         self.__insertions_running[_get_ident()] = 1

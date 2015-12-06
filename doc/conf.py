@@ -16,7 +16,10 @@
 # from http://blog.rtwilson.com/how-to-make-your-sphinx-documentation-compile-with-readthedocs-when-youre-using-numpy-and-scipy/
 import sys
 import os
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 MOCK_MODULES = []
 for mod_name in MOCK_MODULES:

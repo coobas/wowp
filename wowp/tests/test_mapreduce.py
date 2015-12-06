@@ -1,7 +1,11 @@
 from wowp.actors import FuncActor
 from wowp.actors.mapreduce import Map  # , Reduce
 from wowp.schedulers import LinearizedScheduler
-from itertools import zip_longest
+import six
+if six.PY2:
+    from itertools import izip_longest as zip_longest
+else:
+    from itertools import zip_longest
 from string import ascii_uppercase
 
 

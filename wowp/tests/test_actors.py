@@ -1,16 +1,21 @@
+from __future__ import absolute_import, division, print_function
 from wowp.actors import FuncActor, Switch, ShellRunner
 from wowp.schedulers import NaiveScheduler
 from wowp.components import Actor
 import nose
+from nose.plugins.skip import SkipTest
+import six
 
 
 def test_FuncActor_return_annotation():
-    def func(x, y) -> ('a', 'b'):
+    if six.PY2:
+        raise SkipTest
+    def func(x, y):
         return x + 1, y + 2
 
     x, y = 2, 3.1
 
-    fa = FuncActor(func)
+    fa = FuncActor(func, outports=('a', 'b'))
     fa.inports.x.put(x)
     fa.inports.y.put(y)
 
@@ -23,23 +28,23 @@ def test_FuncActor_return_annotation():
 
 
 def test_FuncActor_call():
-    def func(x, y) -> ('a', 'b'):
+    def func(x, y):
         return x + 1, y + 2
 
     x, y = 2, 3.1
 
-    fa = FuncActor(func)
+    fa = FuncActor(func, outports=('a', 'b'))
 
     assert func(x, y) == fa(x, y)
 
 
 def test_FuncActor_partial_args():
-    def func(x, y) -> ('a', 'b'):
+    def func(x, y):
         return x + 1, y + 2
 
     x, y = 2, 3.1
 
-    fa = FuncActor(func, args=(x,))
+    fa = FuncActor(func, args=(x, ), outports=('a', 'b'))
     fa.inports.y.put(y)
 
     NaiveScheduler().run_actor(fa)
@@ -51,12 +56,12 @@ def test_FuncActor_partial_args():
 
 
 def test_FuncActor_partial_kwargs():
-    def func(x, y) -> ('a', 'b'):
+    def func(x, y):
         return x + 1, y + 2
 
     x, y = 2, 3.1
 
-    fa = FuncActor(func, kwargs={'y': y})
+    fa = FuncActor(func, kwargs={'y': y}, outports=('a', 'b'))
     fa.inports.x.put(x)
 
     NaiveScheduler().run_actor(fa)
@@ -99,10 +104,10 @@ def test_LoopWhileActor():
     def condition(x):
         return x < 10
 
-    def func(x) -> ('x'):
+    def func(x):
         return x + 1
 
-    fa = FuncActor(func)
+    fa = FuncActor(func, outports=('x', ))
     lw = Switch("a_loop", condition)
 
     fa.inports['x'] += lw.outports['loop_out']
@@ -121,10 +126,10 @@ def test_LoopWhileActorWithInner():
     def condition(x):
         return x < 10
 
-    def func(x) -> ('x'):
+    def func(x):
         return x + 1
 
-    fa = FuncActor(func)
+    fa = FuncActor(func, outports=('x', ))
     lw = Switch("a_loop", condition, inner_actor=fa)
 
     lw.inports['loop_in'].put(0)

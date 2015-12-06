@@ -9,14 +9,14 @@ def test_two_connected():
     --func1(.)--func2(.)--
     """
 
-    def func1(x) -> ('a'):
+    def func1(x):
         return x * 2
 
-    def func2(a) -> ('y'):
+    def func2(a):
         return a + 3
 
-    actor1 = FuncActor(func1)
-    actor2 = FuncActor(func2)
+    actor1 = FuncActor(func1, outports=('a', ))
+    actor2 = FuncActor(func2, outports=('y', ))
 
     actor2.inports['a'] += actor1.outports['a']
 
@@ -37,16 +37,16 @@ def test_two_to_one_connected():
 
     """
 
-    def func1(x) -> ('a'):
+    def func1(x):
         return x * 2
 
-    def func2(x, y) -> ('a'):
+    def func2(x, y):
         return x + y
 
-    in_actor1 = FuncActor(func1)
-    in_actor2 = FuncActor(func1)
+    in_actor1 = FuncActor(func1, outports=('a', ))
+    in_actor2 = FuncActor(func1, outports=('a', ))
 
-    out_actor = FuncActor(func2)
+    out_actor = FuncActor(func2, outports=('a', ))
 
     out_actor.inports['x'] += in_actor1.outports['a']
     out_actor.inports['y'] += in_actor2.outports['a']
@@ -69,12 +69,12 @@ def test_three_in_line():
     --func(.)--func(.)--func(.)--
     """
 
-    def func(x) -> ('x'):
+    def func(x):
         return x * 2
 
-    actor1 = FuncActor(func)
-    actor2 = FuncActor(func)
-    actor3 = FuncActor(func)
+    actor1 = FuncActor(func, outports=('x', ))
+    actor2 = FuncActor(func, outports=('x', ))
+    actor3 = FuncActor(func, outports=('x', ))
 
     actor2.inports['x'] += actor1.outports['x']
     actor3.inports['x'] += actor2.outports['x']

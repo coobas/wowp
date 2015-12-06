@@ -1,6 +1,8 @@
+from __future__ import absolute_import, division, print_function
 from ..components import Actor
 import inspect
 import itertools
+import six
 
 
 class FuncActor(Actor):
@@ -22,17 +24,25 @@ class FuncActor(Actor):
         super(FuncActor, self).__init__(name=name)
         try:
             # try to derive ports from function signature
-            sig = inspect.signature(func)
-            return_annotation = sig.return_annotation
-            # derive ports from func signature
-            if inports is None:
-                # filter out args (first len(args) arguments and kwargs)
-                inports = (par.name for par in
-                           itertools.islice(sig.parameters.values(), len(args), None)
-                           if par.name not in kwargs)
-            if outports is None and return_annotation is not inspect.Signature.empty:
-                # if func has a return annotation, use it for outports names
-                outports = return_annotation
+            if six.PY2:
+                # Python 2 does not have signatures
+                fargs = inspect.getargspec(func)
+                if inports is None:
+                    inports = (par for par in
+                               itertools.islice(fargs.args, len(args), None)
+                               if par not in kwargs)
+            else:
+                sig = inspect.signature(func)
+                return_annotation = sig.return_annotation
+                # derive ports from func signature
+                if inports is None:
+                    # filter out args (first len(args) arguments and kwargs)
+                    inports = (par.name for par in
+                               itertools.islice(sig.parameters.values(), len(args), None)
+                               if par.name not in kwargs)
+                if outports is None and return_annotation is not inspect.Signature.empty:
+                    # if func has a return annotation, use it for outports names
+                    outports = return_annotation
         except ValueError:
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
@@ -116,7 +126,7 @@ class Switch(Actor):
         return args, kwargs
 
     @classmethod
-    def run(cls, *args, condition_func=None, input_val=None):
+    def run(cls, condition_func=None, input_val=None):
         res = {}
         if condition_func:
             if condition_func(input_val):

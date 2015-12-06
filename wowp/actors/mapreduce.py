@@ -1,4 +1,6 @@
+from __future__ import absolute_import, division, print_function
 from ..components import Actor
+from future.builtins import super
 
 
 class Concat(Actor):

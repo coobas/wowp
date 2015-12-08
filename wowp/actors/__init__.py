@@ -43,7 +43,7 @@ class FuncActor(Actor):
                 if outports is None and return_annotation is not inspect.Signature.empty:
                     # if func has a return annotation, use it for outports names
                     outports = return_annotation
-        except ValueError:
+        except (ValueError, TypeError):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:

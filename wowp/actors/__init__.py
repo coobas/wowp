@@ -48,7 +48,7 @@ class FuncActor(Actor):
             # --> using manual inports
             if inports is None:
                 inports = ('inp',)
-            elif isinstance(inports, str):
+            elif isinstance(inports, six.string_types):
                 inports = (inports,)
         # save func as attribute
         self.func = func
@@ -60,7 +60,7 @@ class FuncActor(Actor):
         # setup outports
         if outports is None:
             outports = ('out',)
-        elif isinstance(outports, str):
+        elif isinstance(outports, six.string_types):
             outports = (outports,)
         for name in outports:
             self.outports.append(name)
@@ -145,7 +145,7 @@ class ShellRunner(Actor):
     def __init__(self, base_command, name=None, binary=False, shell=False):
         super(ShellRunner, self).__init__(name=name)
 
-        if isinstance(base_command, str):
+        if isinstance(base_command, six.string_types):
             self.base_command = (base_command,)
         else:
             self.base_command = base_command
@@ -159,8 +159,8 @@ class ShellRunner(Actor):
 
     def get_run_args(self):
         vals = self.inports['inp'].pop()
-        if isinstance(vals, str):
-            vals = (vals,)
+        if isinstance(vals, six.string_types):
+            vals = (vals, )
         args = self.base_command + vals
         kwargs = {
             'shell': self.shell,

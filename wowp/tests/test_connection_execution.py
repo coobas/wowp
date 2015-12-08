@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from wowp.actors import FuncActor
 from wowp.schedulers import NaiveScheduler
 import nose

@@ -1,6 +1,6 @@
 '''WOWP -- A WOrkfloW Framework in Python
 '''
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 __version__ = '0.0.2'
 __release__ = __version__ + '-alpha'

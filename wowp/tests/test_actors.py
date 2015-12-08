@@ -1,4 +1,4 @@
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
 from wowp.actors import FuncActor, Switch, ShellRunner
 from wowp.schedulers import NaiveScheduler
 from wowp.components import Actor
@@ -141,11 +141,15 @@ def test_LoopWhileActorWithInner():
 
 def test_Shellrunner():
     import platform
+
+    command = "echo"
+    arg = "test"
+
     if platform.system() == 'Windows':
-        runner = ShellRunner("echo", shell=True)
+        runner = ShellRunner(command, shell=True)
     else:
-        runner = ShellRunner("echo", shell=False)
-    runner.inports['inp'].put("test")
+        runner = ShellRunner(command, shell=False)
+    runner.inports['inp'].put(arg)
 
     NaiveScheduler().run_actor(runner)
 
@@ -158,7 +162,7 @@ def test_Shellrunner():
     print("Std err: ", stderr.strip())
 
     assert (rvalue == 0)
-    assert (stdout.strip() == "test")
+    assert (stdout.strip() == arg)
     assert (stderr.strip() == "")
 
 

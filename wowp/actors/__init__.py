@@ -202,3 +202,28 @@ class Sink(Actor):
     @staticmethod
     def run(*args, **kwargs):
         pass
+
+
+class DictionaryMerge(Actor):
+    """This actor merges inputs from all its inports into one dictionary.
+
+    The keys of the dictionary will be equal to inport names.
+    """
+    def __init__(self, name="packager", inport_names=("in"), outport_name="out"):
+        super(DictionaryMerge, self).__init__(name=name)
+        for in_name in inport_names:
+            self.inports.append(in_name)
+        self.outport_name = outport_name
+        self.outports.append(outport_name)
+
+    def get_run_args(self):
+        return (), {
+            "values" : { port.name : port.pop() for port in self.inports },
+            "outport_name" : self.outport_name
+        }
+
+    @classmethod
+    def run(cls, *args, **kwargs):
+        return {
+            kwargs.get("outport_name") : kwargs.get("values")
+        }

@@ -125,12 +125,12 @@ class Component(object):
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(
+                warn('Component without any output: {} ({})'.format(
                     node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref'
+                raise Exception('{} cannot be an output port'.format(node['ref'
                                                                     ]))
 
         return workflow

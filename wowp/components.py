@@ -252,6 +252,9 @@ class Ports(object):
         # TODO add security
         self._ports[key] = value
 
+    def __str__(self):
+        return "Ports: [" + ", ".join(self.keys()) + "]"
+
     def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))

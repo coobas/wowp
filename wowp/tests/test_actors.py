@@ -1,4 +1,4 @@
-from wowp.actors import FuncActor, Switch, ShellRunner
+from wowp.actors import FuncActor, Switch, ShellRunner, DictionaryMerge
 from wowp.schedulers import NaiveScheduler
 from wowp.components import Actor
 import nose
@@ -155,6 +155,20 @@ def test_Shellrunner():
     assert (rvalue == 0)
     assert (stdout.strip() == "test")
     assert (stderr.strip() == "")
+
+
+def test_DictionaryMerge():
+    d = DictionaryMerge(inport_names=("a", "b"))
+    d.inports["a"].put("aa")
+    d.inports["b"].put("bb")
+
+    NaiveScheduler().run_actor(d)
+
+    out = d.outports["out"].pop()
+
+    assert (len(out) == 2)
+    assert (out["a"] == "aa")
+    assert (out["b"] == "bb")
 
 
 if __name__ == '__main__':

@@ -104,6 +104,22 @@ class LinearizedScheduler(_ActorRunner):
                 self.run_actor(in_port.owner)
 
 
+class _IPySystemJob(object):
+    """
+    System (local run) IPython parallel like job
+    """
+    def __init__(self, actor, *args, **kwargs):
+        self.actor = actor
+        self.args = args
+        self.kwargs = kwargs
+
+    def ready(self):
+        return True
+
+    def get(self):
+        return self.actor.run(*self.args, **self.kwargs)
+
+
 class IPyClusterScheduler(_ActorRunner):
     """
     Scheduler using IPython Cluster.
@@ -191,7 +207,11 @@ class IPyClusterScheduler(_ActorRunner):
         # print("Run actor {}".format(actor))
         actor.scheduler = self
         args, kwargs = actor.get_run_args()
-        return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+        # system actors must be run within this process
+        if actor.system_actor:
+            return _IPySystemJob(actor, *args, **kwargs)
+        else:
+            return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
 
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):

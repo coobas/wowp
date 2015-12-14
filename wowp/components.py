@@ -157,6 +157,10 @@ class Actor(Component):
         res = self.run(*args, **kwargs)
         return res
 
+    @property
+    def system_actor(self):
+        return getattr(self, '_system_actor', False)
+
 
 class Composite(Component):
     """Composite = a group of actors

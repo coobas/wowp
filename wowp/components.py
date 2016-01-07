@@ -128,12 +128,12 @@ class Component(object):
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(
+                warn('Component without any output: {} ({})'.format(
                     node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref'
+                raise Exception('{} cannot be an output port'.format(node['ref'
                                                                     ]))
 
         return workflow
@@ -159,6 +159,10 @@ class Actor(Component):
         args, kwargs = self.get_run_args()
         res = self.run(*args, **kwargs)
         return res
+
+    @property
+    def system_actor(self):
+        return getattr(self, '_system_actor', False)
 
 
 class Composite(Component):
@@ -254,6 +258,9 @@ class Ports(object):
         # must be implemented for +=, -= operators
         # TODO add security
         self._ports[key] = value
+
+    def __str__(self):
+        return "Ports: [" + ", ".join(self.keys()) + "]"
 
     def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
         if not replace_existing and new_port_name in self._ports:

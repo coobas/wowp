@@ -140,18 +140,30 @@ class Switch(Actor):
 
 
 class ShellRunner(Actor):
-    """An actor executing external command."""
+    """An actor executing external command.
 
-    def __init__(self, base_command, name=None, binary=False, shell=False):
+    Basically, it calls subprocess.call(base_command + inp) or
+    subprocess.call(base_command.format(inp)) in case format_inp is True.
+
+    Args:
+        base_command: the command to be run, may be a template
+        binary: input/output in binary mode
+        shell: shell parameter in subprocess.call
+        format_inp: use base_command.format(inp) instead of the simple concatenation
+    """
+
+    def __init__(self, base_command, name=None,
+                 binary=False, shell=False, format_inp=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
-            self.base_command = (base_command,)
+            self.base_command = (base_command, )
         else:
             self.base_command = base_command
 
         self.binary = binary
         self.shell = shell
+        self.format_inp = format_inp
         self.inports.append('inp')
         self.outports.append('stdout')
         self.outports.append('stderr')
@@ -159,9 +171,12 @@ class ShellRunner(Actor):
 
     def get_run_args(self):
         vals = self.inports['inp'].pop()
-        if isinstance(vals, six.string_types):
-            vals = (vals, )
-        args = self.base_command + vals
+        if self.format_inp:
+            args = (self.base_command[0].format(vals), )
+        elif isinstance(vals, six.string_types):
+            args = self.base_command + (vals, )
+        else:
+            args = self.base_command + vals
         kwargs = {
             'shell': self.shell,
             'binary': self.binary,
@@ -182,9 +197,11 @@ class ShellRunner(Actor):
 
         with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
             if kwargs['shell']:
-                result = subprocess.call(' '.join(args), stdout=fout, stderr=ferr, shell=kwargs['shell'])
+                result = subprocess.call(' '.join(args), stdout=fout, stderr=ferr,
+                                         shell=kwargs['shell'])
             else:
-                result = subprocess.call(args, stdout=fout, stderr=ferr, shell=kwargs['shell'])
+                result = subprocess.call(args, stdout=fout, stderr=ferr,
+                                         shell=kwargs['shell'])
             fout.seek(0)
             ferr.seek(0)
             cout = fout.read()

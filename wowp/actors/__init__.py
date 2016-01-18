@@ -149,11 +149,14 @@ class ShellRunner(Actor):
         base_command: the command to be run, may be a template
         binary: input/output in binary mode
         shell: shell parameter in subprocess.call
-        format_inp: use base_command.format(inp) instead of the simple concatenation
+        format_inp: 'args' triggers base_command.format(*inp),
+                    'kwargs' triggers base_command.format(**inp)
+        single_out: join outputs into a single dict
     """
 
     def __init__(self, base_command, name=None,
-                 binary=False, shell=False, format_inp=False):
+                 binary=False, shell=False, format_inp=False,
+                 single_out=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
@@ -165,14 +168,20 @@ class ShellRunner(Actor):
         self.shell = shell
         self.format_inp = format_inp
         self.inports.append('inp')
-        self.outports.append('stdout')
-        self.outports.append('stderr')
-        self.outports.append('ret')
+        self.single_out = single_out
+        if single_out:
+            self.outports.append('out')
+        else:
+            self.outports.append('stdout')
+            self.outports.append('stderr')
+            self.outports.append('ret')
 
     def get_run_args(self):
         vals = self.inports['inp'].pop()
-        if self.format_inp:
-            args = (self.base_command[0].format(vals), )
+        if self.format_inp == 'args':
+            args = (self.base_command[0].format(*vals), )
+        elif self.format_inp == 'kwargs':
+            args = (self.base_command[0].format(**vals), )
         elif isinstance(vals, six.string_types):
             args = self.base_command + (vals, )
         else:
@@ -180,6 +189,7 @@ class ShellRunner(Actor):
         kwargs = {
             'shell': self.shell,
             'binary': self.binary,
+            'single_out': self.single_out,
         }
         return args, kwargs
 
@@ -187,8 +197,6 @@ class ShellRunner(Actor):
     def run(cls, *args, **kwargs):
         import subprocess
         import tempfile
-
-        print(args)
 
         if kwargs['binary']:
             mode = "w+b"
@@ -211,6 +219,8 @@ class ShellRunner(Actor):
             'stdout': cout,
             'stderr': cerr
         }
+        if kwargs['single_out']:
+            res = {'out': res}
         return res
 
 

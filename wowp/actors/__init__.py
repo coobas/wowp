@@ -152,11 +152,12 @@ class ShellRunner(Actor):
         format_inp: 'args' triggers base_command.format(*inp),
                     'kwargs' triggers base_command.format(**inp)
         single_out: join outputs into a single dict
+        debug_print: print debug info
     """
 
     def __init__(self, base_command, name=None,
                  binary=False, shell=False, format_inp=False,
-                 single_out=False):
+                 single_out=False, debug_print=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
@@ -169,6 +170,7 @@ class ShellRunner(Actor):
         self.format_inp = format_inp
         self.inports.append('inp')
         self.single_out = single_out
+        self.debug_print = debug_print
         if single_out:
             self.outports.append('out')
         else:
@@ -190,6 +192,7 @@ class ShellRunner(Actor):
             'shell': self.shell,
             'binary': self.binary,
             'single_out': self.single_out,
+            'debug_print': self.debug_print,
         }
         return args, kwargs
 
@@ -197,6 +200,9 @@ class ShellRunner(Actor):
     def run(cls, *args, **kwargs):
         import subprocess
         import tempfile
+
+        if kwargs['debug_print']:
+            print('run command:\n{}'.format(' '.join(args)))
 
         if kwargs['binary']:
             mode = "w+b"
@@ -219,6 +225,8 @@ class ShellRunner(Actor):
             'stdout': cout,
             'stderr': cerr
         }
+        if kwargs['debug_print']:
+            print('result:\n{}'.format(res))
         if kwargs['single_out']:
             res = {'out': res}
         return res

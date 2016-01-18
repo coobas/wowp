@@ -28,8 +28,8 @@ class FuncActor(Actor):
                 # Python 2 does not have signatures
                 fargs = inspect.getargspec(func)
                 if inports is None:
-                    inports = (par for par in
-                               itertools.islice(fargs.args, len(args), None)
+                    inports = (par
+                               for par in itertools.islice(fargs.args, len(args), None)
                                if par not in kwargs)
             else:
                 sig = inspect.signature(func)
@@ -37,9 +37,10 @@ class FuncActor(Actor):
                 # derive ports from func signature
                 if inports is None:
                     # filter out args (first len(args) arguments and kwargs)
-                    inports = (par.name for par in
-                               itertools.islice(sig.parameters.values(), len(args), None)
-                               if par.name not in kwargs)
+                    inports = (
+                        par.name
+                        for par in itertools.islice(sig.parameters.values(), len(args), None)
+                        if par.name not in kwargs)
                 if outports is None and return_annotation is not inspect.Signature.empty:
                     # if func has a return annotation, use it for outports names
                     outports = return_annotation
@@ -47,9 +48,9 @@ class FuncActor(Actor):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('inp',)
+                inports = ('inp', )
             elif isinstance(inports, six.string_types):
-                inports = (inports,)
+                inports = (inports, )
         # save func as attribute
         self.func = func
         self._func_args = args
@@ -59,9 +60,9 @@ class FuncActor(Actor):
             self.inports.append(name)
         # setup outports
         if outports is None:
-            outports = ('out',)
+            outports = ('out', )
         elif isinstance(outports, six.string_types):
-            outports = (outports,)
+            outports = (outports, )
         for name in outports:
             self.outports.append(name)
 
@@ -76,14 +77,14 @@ class FuncActor(Actor):
 
         return args, kwargs
 
-    @classmethod
-    def run(cls, *args, **kwargs):
+    @staticmethod
+    def run(*args, **kwargs):
         args = kwargs['func_args'] + args
         func_res = kwargs['func'](*args, **kwargs['func_kwargs'])
         outports = kwargs['outports']
 
         if len(outports) == 1:
-            func_res = (func_res,)
+            func_res = (func_res, )
         # iterate over ports and return values
         res = {name: value for name, value in zip(outports, func_res)}
         return res
@@ -125,8 +126,8 @@ class Switch(Actor):
         args = ()
         return args, kwargs
 
-    @classmethod
-    def run(cls, condition_func=None, input_val=None):
+    @staticmethod
+    def run(condition_func=None, input_val=None):
         res = {}
         if condition_func:
             if condition_func(input_val):
@@ -155,9 +156,14 @@ class ShellRunner(Actor):
         debug_print: print debug info
     """
 
-    def __init__(self, base_command, name=None,
-                 binary=False, shell=False, format_inp=False,
-                 single_out=False, debug_print=False):
+    def __init__(self,
+                 base_command,
+                 name=None,
+                 binary=False,
+                 shell=False,
+                 format_inp=False,
+                 single_out=False,
+                 debug_print=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
@@ -196,8 +202,8 @@ class ShellRunner(Actor):
         }
         return args, kwargs
 
-    @classmethod
-    def run(cls, *args, **kwargs):
+    @staticmethod
+    def run(*args, **kwargs):
         import subprocess
         import tempfile
 
@@ -209,22 +215,23 @@ class ShellRunner(Actor):
         else:
             mode = "w+t"
 
-        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
+        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(
+                mode=mode) as ferr:
             if kwargs['shell']:
-                result = subprocess.call(' '.join(args), stdout=fout, stderr=ferr,
+                result = subprocess.call(' '.join(args),
+                                         stdout=fout,
+                                         stderr=ferr,
                                          shell=kwargs['shell'])
             else:
-                result = subprocess.call(args, stdout=fout, stderr=ferr,
+                result = subprocess.call(args,
+                                         stdout=fout,
+                                         stderr=ferr,
                                          shell=kwargs['shell'])
             fout.seek(0)
             ferr.seek(0)
             cout = fout.read()
             cerr = ferr.read()
-        res = {
-            'ret': result,
-            'stdout': cout,
-            'stderr': cerr
-        }
+        res = {'ret': result, 'stdout': cout, 'stderr': cerr}
         if kwargs['debug_print']:
             print('result:\n{}'.format(res))
         if kwargs['single_out']:
@@ -254,6 +261,7 @@ class DictionaryMerge(Actor):
 
     The keys of the dictionary will be equal to inport names.
     """
+
     def __init__(self, name="packager", inport_names=("in"), outport_name="out"):
         super(DictionaryMerge, self).__init__(name=name)
         for in_name in inport_names:
@@ -263,12 +271,11 @@ class DictionaryMerge(Actor):
 
     def get_run_args(self):
         return (), {
-            "values" : { port.name : port.pop() for port in self.inports },
-            "outport_name" : self.outport_name
+            "values": {port.name: port.pop()
+                       for port in self.inports},
+            "outport_name": self.outport_name
         }
 
-    @classmethod
-    def run(cls, *args, **kwargs):
-        return {
-            kwargs.get("outport_name") : kwargs.get("values")
-        }
+    @staticmethod
+    def run(*args, **kwargs):
+        return {kwargs.get("outport_name"): kwargs.get("values")}

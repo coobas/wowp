@@ -1,4 +1,5 @@
 from . import Actor
+from .. schedulers import LinearizedScheduler
 
 
 class GeneratorActor(Actor):
@@ -69,3 +70,47 @@ class Splitter(Actor):
 
         # TODO: Add SequentialMerger
         # TODO: Add RandomMerger
+
+
+class Chain(Actor):
+    """Chain of actors.
+
+    Each of the chain link has to have just one input & output port.
+    """
+    _system_actor = True
+
+    def __init__(self, name, classes_or_instances, **kwargs):
+        """
+
+        :param name:
+        :param classes_or_instances: iterable of actors or their creators
+        :param kwargs:
+        :return:
+        """
+        super(Chain, self).__init__(name=name)
+        self.actors = []
+        if len(classes_or_instances) < 1:
+            raise RuntimeError("Chain needs at least one item.")
+        self.inports.append("input")
+        self.outports.append("output")
+        for item in classes_or_instances:
+            if isinstance(item, Actor):
+                actor = item
+            else:
+                actor = item()
+            assert len(actor.inports) == 1
+            assert len(actor.outports) == 1
+            if self.actors:
+                inport = actor.inports.at(0)
+                inport += self.actors[-1].outports.at(0)
+            self.actors.append(actor)
+
+    def get_run_args(self):
+        return (), { }
+
+    def run(self, *args, **kwargs):
+        input = self.inports["input"].pop()
+        scheduler = LinearizedScheduler()
+        scheduler.put_value(self.actors[0].inports.at(0), input)
+        scheduler.execute()
+        return {"output" : self.actors[-1].outports.at(0).pop()}

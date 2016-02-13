@@ -135,6 +135,12 @@ class Component(object):
 
         return workflow
 
+    @classmethod
+    def create_prototype(cls, *args, **kwargs):
+        """Construction of a the object with parameters, packed in an object."""
+        def prototype():
+            return cls(*args, **kwargs)
+        return prototype
 
 class Actor(Component):
     """Actor class
@@ -273,6 +279,12 @@ class Ports(object):
 
     def keys(self):
         return list(self._ports.keys())
+
+    def at(self, index):
+        """Get port by number."""
+        key = self.keys()[index]
+        return self[key]
+
 
 
 class Port(object):

@@ -1,8 +1,13 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from collections import OrderedDict as _OrderedDict
 import warnings
+import six
 
 try:
-    from threading import get_ident as _get_ident
+    if six.PY3:
+        from threading import get_ident as _get_ident
+    else:
+        from thread import get_ident as _get_ident
 except ImportError:
     from dummy_threading import get_ident as _get_ident
 

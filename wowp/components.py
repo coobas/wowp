@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from .util import ListDict, deprecated
 from collections import deque
 from . import logger
@@ -6,6 +7,8 @@ import networkx as nx
 import functools
 import keyword
 from warnings import warn
+import future
+from future.builtins import super
 
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
 
@@ -418,7 +421,7 @@ class InPort(Port):
 def is_valid_port_name(name):
     """Validate port name
     """
-    if name.isidentifier() and not keyword.iskeyword(name):
+    if future.utils.isidentifier(name) and not keyword.iskeyword(name):
         return True
     else:
         return False

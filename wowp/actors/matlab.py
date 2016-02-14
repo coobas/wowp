@@ -10,7 +10,7 @@ from . import Actor
 import stopit
 import matlab.engine
 from warnings import warn
-
+import six
 
 class EngineManager(object):
     """Matlab engine with a shared pool"""
@@ -68,12 +68,12 @@ class MatlabMethod(Actor):
 
         super().__init__(name=self.method_name)
 
-        if isinstance(inports, str):
+        if isinstance(inports, six.string_types):
             inports = (inports,)
         for p in inports:
             self.inports.append(p)
 
-        if isinstance(outports, str):
+        if isinstance(outports, six.string_types):
             outports = (outports,)
         for p in outports:
             self.outports.append(p)

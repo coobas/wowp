@@ -1,0 +1,6 @@
+decorator
+future
+ipyparallel
+networkx
+nose
+six

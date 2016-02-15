@@ -75,42 +75,46 @@ class Splitter(Actor):
 class Chain(Actor):
     """Chain of actors.
 
-    Each of the chain link has to have just one input & output port.
+    Each of the chain link has to have just one input & output port (to be changed)
     """
-    _system_actor = True
 
-    def __init__(self, name, classes_or_instances, **kwargs):
+    def __init__(self, name, actor_generators, **kwargs):
         """
 
         :param name:
-        :param classes_or_instances: iterable of actors or their creators
+        :param actor_generators: iterable of actor classes or generators
         :param kwargs:
         :return:
         """
         super(Chain, self).__init__(name=name)
         self.actors = []
-        if len(classes_or_instances) < 1:
+        if len(actor_generators) < 1:
             raise RuntimeError("Chain needs at least one item.")
         self.inports.append("input")
         self.outports.append("output")
-        for item in classes_or_instances:
-            if isinstance(item, Actor):
-                actor = item
-            else:
-                actor = item()
-            assert len(actor.inports) == 1
-            assert len(actor.outports) == 1
-            if self.actors:
-                inport = actor.inports.at(0)
-                inport += self.actors[-1].outports.at(0)
-            self.actors.append(actor)
+        self.actor_generators = actor_generators
 
     def get_run_args(self):
-        return (), { }
+        return (
+            self.inports["input"].pop(),
+        ), {
+            "generators" : self.actor_generators
+        }
 
     def run(self, *args, **kwargs):
-        input = self.inports["input"].pop()
+        input = args[0]
+        actor_generators = kwargs.pop("generators")
+        actors = []
+        for generator in actor_generators:
+            actor = generator()
+            assert len(actor.inports) == 1
+            assert len(actor.outports) == 1
+            if actors:
+                inport = actor.inports.at(0)
+                inport += actors[-1].outports.at(0)
+            actors.append(actor)
+
         scheduler = LinearizedScheduler()
-        scheduler.put_value(self.actors[0].inports.at(0), input)
+        scheduler.put_value(actors[0].inports.at(0), input)
         scheduler.execute()
-        return {"output" : self.actors[-1].outports.at(0).pop()}
+        return {"output" : actors[-1].outports.at(0).pop()}

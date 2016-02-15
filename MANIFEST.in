@@ -1,0 +1,5 @@
+include *.rst
+include LICENSE.txt
+include requirements.txt
+include README.md
+prune notebooks

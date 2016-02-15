@@ -1,6 +1,6 @@
 from . import Actor
 from julia import Julia, JuliaError
-
+import six
 
 class JuliaMethod(Actor):
     def __init__(self, method_name, package_name=None, inports=(), outports='result'):
@@ -8,12 +8,12 @@ class JuliaMethod(Actor):
         self.package_name = package_name
         super(JuliaMethod, self).__init__(name=self._full_method_name)
 
-        if isinstance(inports, str):
+        if isinstance(inports, six.string_types):
             inports = (inports,)
         for p in inports:
             self.inports.append(p)
 
-        if isinstance(outports, str):
+        if isinstance(outports, six.string_types):
             outports = (outports,)
         for p in outports:
             self.outports.append(p)

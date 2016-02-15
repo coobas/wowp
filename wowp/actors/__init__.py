@@ -1,6 +1,8 @@
+from __future__ import absolute_import, division, print_function
 from ..components import Actor
 import inspect
 import itertools
+import six
 
 
 class FuncActor(Actor):
@@ -22,24 +24,33 @@ class FuncActor(Actor):
         super(FuncActor, self).__init__(name=name)
         try:
             # try to derive ports from function signature
-            sig = inspect.signature(func)
-            return_annotation = sig.return_annotation
-            # derive ports from func signature
-            if inports is None:
-                # filter out args (first len(args) arguments and kwargs)
-                inports = (par.name for par in
-                           itertools.islice(sig.parameters.values(), len(args), None)
-                           if par.name not in kwargs)
-            if outports is None and return_annotation is not inspect.Signature.empty:
-                # if func has a return annotation, use it for outports names
-                outports = return_annotation
-        except ValueError:
+            if six.PY2:
+                # Python 2 does not have signatures
+                fargs = inspect.getargspec(func)
+                if inports is None:
+                    inports = (par
+                               for par in itertools.islice(fargs.args, len(args), None)
+                               if par not in kwargs)
+            else:
+                sig = inspect.signature(func)
+                return_annotation = sig.return_annotation
+                # derive ports from func signature
+                if inports is None:
+                    # filter out args (first len(args) arguments and kwargs)
+                    inports = (
+                        par.name
+                        for par in itertools.islice(sig.parameters.values(), len(args), None)
+                        if par.name not in kwargs)
+                if outports is None and return_annotation is not inspect.Signature.empty:
+                    # if func has a return annotation, use it for outports names
+                    outports = return_annotation
+        except (ValueError, TypeError):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('inp',)
-            elif isinstance(inports, str):
-                inports = (inports,)
+                inports = ('inp', )
+            elif isinstance(inports, six.string_types):
+                inports = (inports, )
         # save func as attribute
         self.func = func
         self._func_args = args
@@ -49,9 +60,9 @@ class FuncActor(Actor):
             self.inports.append(name)
         # setup outports
         if outports is None:
-            outports = ('out',)
-        elif isinstance(outports, str):
-            outports = (outports,)
+            outports = ('out', )
+        elif isinstance(outports, six.string_types):
+            outports = (outports, )
         for name in outports:
             self.outports.append(name)
 
@@ -66,14 +77,14 @@ class FuncActor(Actor):
 
         return args, kwargs
 
-    @classmethod
-    def run(cls, *args, **kwargs):
+    @staticmethod
+    def run(*args, **kwargs):
         args = kwargs['func_args'] + args
         func_res = kwargs['func'](*args, **kwargs['func_kwargs'])
         outports = kwargs['outports']
 
         if len(outports) == 1:
-            func_res = (func_res,)
+            func_res = (func_res, )
         # iterate over ports and return values
         res = {name: value for name, value in zip(outports, func_res)}
         return res
@@ -115,8 +126,8 @@ class Switch(Actor):
         args = ()
         return args, kwargs
 
-    @classmethod
-    def run(cls, *args, condition_func=None, input_val=None):
+    @staticmethod
+    def run(condition_func=None, input_val=None):
         res = {}
         if condition_func:
             if condition_func(input_val):
@@ -130,60 +141,101 @@ class Switch(Actor):
 
 
 class ShellRunner(Actor):
-    """An actor executing external command."""
+    """An actor executing external command.
 
-    def __init__(self, base_command, name=None, binary=False, shell=False):
+    Basically, it calls subprocess.call(base_command + inp) or
+    subprocess.call(base_command.format(inp)) in case format_inp is True.
+
+    Args:
+        base_command: the command to be run, may be a template
+        binary: input/output in binary mode
+        shell: shell parameter in subprocess.call
+        format_inp: 'args' triggers base_command.format(*inp),
+                    'kwargs' triggers base_command.format(**inp)
+        single_out: join outputs into a single dict
+        debug_print: print debug info
+    """
+
+    def __init__(self,
+                 base_command,
+                 name=None,
+                 binary=False,
+                 shell=False,
+                 format_inp=False,
+                 single_out=False,
+                 debug_print=False):
         super(ShellRunner, self).__init__(name=name)
 
-        if isinstance(base_command, str):
-            self.base_command = (base_command,)
+        if isinstance(base_command, six.string_types):
+            self.base_command = (base_command, )
         else:
             self.base_command = base_command
 
         self.binary = binary
         self.shell = shell
+        self.format_inp = format_inp
         self.inports.append('inp')
-        self.outports.append('stdout')
-        self.outports.append('stderr')
-        self.outports.append('ret')
+        self.single_out = single_out
+        self.debug_print = debug_print
+        if single_out:
+            self.outports.append('out')
+        else:
+            self.outports.append('stdout')
+            self.outports.append('stderr')
+            self.outports.append('ret')
 
     def get_run_args(self):
         vals = self.inports['inp'].pop()
-        if isinstance(vals, str):
-            vals = (vals,)
-        args = self.base_command + vals
+        if self.format_inp == 'args':
+            args = (self.base_command[0].format(*vals), )
+        elif self.format_inp == 'kwargs':
+            args = (self.base_command[0].format(**vals), )
+        elif isinstance(vals, six.string_types):
+            args = self.base_command + (vals, )
+        else:
+            args = self.base_command + vals
         kwargs = {
             'shell': self.shell,
             'binary': self.binary,
+            'single_out': self.single_out,
+            'debug_print': self.debug_print,
         }
         return args, kwargs
 
-    @classmethod
-    def run(cls, *args, **kwargs):
+    @staticmethod
+    def run(*args, **kwargs):
         import subprocess
         import tempfile
 
-        print(args)
+        if kwargs['debug_print']:
+            print('run command:\n{}'.format(' '.join(args)))
 
         if kwargs['binary']:
             mode = "w+b"
         else:
             mode = "w+t"
 
-        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
+        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(
+                mode=mode) as ferr:
             if kwargs['shell']:
-                result = subprocess.call(' '.join(args), stdout=fout, stderr=ferr, shell=kwargs['shell'])
+                result = subprocess.call(' '.join(args),
+                                         stdout=fout,
+                                         stderr=ferr,
+                                         shell=kwargs['shell'])
             else:
-                result = subprocess.call(args, stdout=fout, stderr=ferr, shell=kwargs['shell'])
+                result = subprocess.call(args,
+                                         stdout=fout,
+                                         stderr=ferr,
+                                         shell=kwargs['shell'])
             fout.seek(0)
             ferr.seek(0)
             cout = fout.read()
             cerr = ferr.read()
-        res = {
-            'ret': result,
-            'stdout': cout,
-            'stderr': cerr
-        }
+        res = {'ret': result, 'stdout': cout, 'stderr': cerr}
+        if kwargs['debug_print']:
+            print('result:\n{}'.format(res))
+        if kwargs['single_out']:
+            res = {'out': res}
         return res
 
 
@@ -209,6 +261,7 @@ class DictionaryMerge(Actor):
 
     The keys of the dictionary will be equal to inport names.
     """
+
     def __init__(self, name="packager", inport_names=("in"), outport_name="out"):
         super(DictionaryMerge, self).__init__(name=name)
         for in_name in inport_names:
@@ -218,12 +271,11 @@ class DictionaryMerge(Actor):
 
     def get_run_args(self):
         return (), {
-            "values" : { port.name : port.pop() for port in self.inports },
-            "outport_name" : self.outport_name
+            "values": {port.name: port.pop()
+                       for port in self.inports},
+            "outport_name": self.outport_name
         }
 
-    @classmethod
-    def run(cls, *args, **kwargs):
-        return {
-            kwargs.get("outport_name") : kwargs.get("values")
-        }
+    @staticmethod
+    def run(*args, **kwargs):
+        return {kwargs.get("outport_name"): kwargs.get("values")}

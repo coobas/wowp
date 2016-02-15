@@ -1,18 +1,20 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from wowp.actors import FuncActor, Switch
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
 import nose
 
 
 def test_LinearizedScheduler_loop1000():
-    scheduler = LinearizedScheduler()
 
     def condition(x):
         return x < 1000
 
-    def func(x) -> ('x'):
+    def func(x):
         return x + 1
 
-    fa = FuncActor(func)
+    scheduler = LinearizedScheduler()
+
+    fa = FuncActor(func, outports=('x', ))
     lw = Switch("a_loop", condition)
 
     fa.inports['x'] += lw.outports['loop_out']
@@ -26,27 +28,27 @@ def test_LinearizedScheduler_loop1000():
 
 
 def _run_tree_512_test(scheduler):
-    def sum(a, b) -> ('a'):
+    def sum(a, b):
         return a + b
 
-    def ident(a) -> ('a'):
+    def ident(a):
         return a
 
     def _split_and_sum(act, depth):
         if depth == 0:
             return act
         else:
-            child1 = FuncActor(ident)
-            child2 = FuncActor(ident)
+            child1 = FuncActor(ident, outports=('a', ))
+            child2 = FuncActor(ident, outports=('a', ))
             act.outports['a'].connect(child1.inports['a'])
             act.outports['a'].connect(child2.inports['a'])
             children = [_split_and_sum(child, depth - 1) for child in (child1, child2)]
-            summer = FuncActor(sum)
+            summer = FuncActor(sum, outports=('a', ))
             summer.inports['a'].connect(children[0].outports['a'])
             summer.inports['b'].connect(children[1].outports['a'])
             return summer
 
-    first = FuncActor(ident)
+    first = FuncActor(ident, outports=('a', ))
 
     power = 8
     last = _split_and_sum(first, power)
@@ -68,13 +70,13 @@ def test_all_schedulers():
 def test_ThrededScheduler_creates_threads_and_executes_all():
     """Test whether more threads are being used by the scheduler"""
     thread_ids = set()
-    jobs_executed = 0
+    jobs_executed = {'count': 0}
 
-    def func(x) -> ('x'):
-        nonlocal jobs_executed
+    def func(x):
+        # nonlocal jobs_executed
         import threading
         thread_ids.add(threading.current_thread().ident)
-        jobs_executed += 1
+        jobs_executed['count'] += 1
         return x
 
     branch_count = 40  # times 2
@@ -87,7 +89,7 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
         actors = []
 
         for j in range(branch_length):
-            actor = FuncActor(func)
+            actor = FuncActor(func, outports=('x', ))
             if j == 0:
                 scheduler.put_value(actor.inports['x'], 0)
             else:
@@ -98,7 +100,7 @@ def test_ThrededScheduler_creates_threads_and_executes_all():
     # How many threads were used
     assert thread_count >= len(thread_ids)
     assert 1 < len(thread_ids)
-    assert jobs_executed == branch_count * branch_length
+    assert jobs_executed['count'] == branch_count * branch_length
 
 
 def _run_linearity_test(scheduler):
@@ -109,19 +111,19 @@ def _run_linearity_test(scheduler):
 
     original_sequence = list(range(max_))
 
-    def orig(x) -> ('x'):
+    def orig(x):
         # print("In act1:", x)
         return x
 
-    def app_fn(x) -> ('x'):
+    def app_fn(x):
         # print("In act2:", x)
         s = random.randint(1, 30) / 1000.0
         sleep(s)
         return x
 
-    orig_actor = FuncActor(orig)
+    orig_actor = FuncActor(orig, outports=('x', ))
     orig_actor.scheduler = scheduler
-    new_actor = FuncActor(app_fn)
+    new_actor = FuncActor(app_fn, outports=('x', ))
     orig_actor.outports["x"].connect(new_actor.inports["x"])
 
     for i in range(max_):

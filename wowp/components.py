@@ -277,6 +277,12 @@ class Ports(object):
     def keys(self):
         return list(self._ports.keys())
 
+    def at(self, index):
+        """Get port by number."""
+        key = self.keys()[index]
+        return self[key]
+
+
 
 class Port(object):
     """Represents a single input/output actor port

@@ -68,3 +68,14 @@ def deprecated(func):
     new_func.__doc__ = func.__doc__
     new_func.__dict__.update(func.__dict__)
     return new_func
+
+
+class ConstructorWrapper(object):
+    """This can be used as deferred construction call."""
+    def __init__(self, klass, *args, **kwargs):
+        self.klass = klass
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self):
+        return self.klass(*self.args, *self.kwargs)

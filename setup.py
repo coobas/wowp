@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
+from wowp import __version__
 
 setup(
         name='wowp',
-        version='0.1.0',
+        version=__version__,
         packages=find_packages(),
         license='MIT',
         description='Data-flow-actors-based workflow framework',
-        # long_description=open('README.md').read(),
+        long_description=open('README.txt').read(),
         author='Jakub Urban, Jan Pipek',
         author_email='coobas at gmail dt com',
         url='http://pythonic.eu/wowp/',

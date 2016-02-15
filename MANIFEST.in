@@ -1,5 +1,6 @@
 include *.rst
 include LICENSE.txt
 include requirements.txt
-include README.md
+include README.txt
 prune notebooks
+prune doc

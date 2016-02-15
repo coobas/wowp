@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from wowp.actors.experimental import Splitter, Chain
 from wowp.schedulers import NaiveScheduler
 from wowp.actors import FuncActor
+from wowp.util import ConstructorWrapper
 
 
 def test_splitter():
@@ -26,7 +27,7 @@ def double_me(x):
     return x * 2
 
 def test_chain():
-    func_generator = FuncActor.create_prototype(double_me)
+    func_generator = ConstructorWrapper(FuncActor, double_me)
     chain = Chain("func_chain", [func_generator, func_generator])
     wf = chain.get_workflow()
     res = wf(input = 4)

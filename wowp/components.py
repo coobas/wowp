@@ -138,12 +138,6 @@ class Component(object):
 
         return workflow
 
-    @classmethod
-    def create_prototype(cls, *args, **kwargs):
-        """Construction of a the object with parameters, packed in an object."""
-        def prototype():
-            return cls(*args, **kwargs)
-        return prototype
 
 class Actor(Component):
     """Actor class

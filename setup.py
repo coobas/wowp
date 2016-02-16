@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
-from wowp import __version__
+from _wowp_setup import get_version
 
 setup(
         name='wowp',
-        version=__version__,
+        version=get_version(),
         packages=find_packages(),
         license='MIT',
         description='Data-flow-actors-based workflow framework',

@@ -63,4 +63,5 @@ def test_map_shell():
 #     assert res['out'] == test_str.upper()
 
 if __name__ == '__main__':
+    import nose
     nose.run(argv=[__file__, '-vv'])

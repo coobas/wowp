@@ -144,7 +144,7 @@ class IPyClusterScheduler(_ActorRunner):
         '''Get a connection (view) to an IPython cluster
         '''
 
-        from IPython.parallel import Client
+        from ipyparallel import Client
 
         self._ipy_rc = Client(profile=profile)
         self._ipy_dv = self._ipy_rc[:]

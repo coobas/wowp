@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from .util import ListDict, deprecated
 from collections import deque
-from . import logger
+from .logger import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
 import networkx as nx
 import functools

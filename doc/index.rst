@@ -56,6 +56,7 @@ Tutorials
    Tutorial/Generator actor
    Tutorial/Massive tree workflow
    Tutorial/Map parallel
+   Tutorial/Map-Chain
 
 
 Reference

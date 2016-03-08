@@ -126,13 +126,13 @@ class IPyClusterScheduler(_ActorRunner):
     Scheduler using IPython Cluster.
     """
 
-    def __init__(self, profile=None):
+    def __init__(self, *args, **kwargs):
         self.process_pool = []
         # actor: job
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
-        self.init_cluster(profile)
+        self.init_cluster(*args, **kwargs)
 
     def copy(self):
         return self.__class__(max_procs=self.max_procs)
@@ -140,13 +140,13 @@ class IPyClusterScheduler(_ActorRunner):
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))
 
-    def init_cluster(self, profile):
+    def init_cluster(self, *args, **kwargs):
         '''Get a connection (view) to an IPython cluster
         '''
 
         from ipyparallel import Client
 
-        self._ipy_rc = Client(profile=profile)
+        self._ipy_rc = Client(*args, **kwargs)
         self._ipy_dv = self._ipy_rc[:]
         self._ipy_lv = self._ipy_rc.load_balanced_view()
 

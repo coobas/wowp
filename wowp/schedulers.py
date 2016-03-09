@@ -124,11 +124,18 @@ class _IPySystemJob(object):
 class IPyClusterScheduler(_ActorRunner):
     """
     Scheduler using IPython Cluster.
+
+    Args:
+        display_outputs (Optional[bool]): display stdout/err from actors
+        *args: passed to self.init_cluster(*args, **kwargs)
+        **kwargs: passed to self.init_cluster(*args, **kwargs)
+
     """
 
     def __init__(self, *args, **kwargs):
         self.process_pool = []
         # actor: job
+        self.display_outputs = kwargs.pop('display_outputs', False)
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
@@ -142,6 +149,10 @@ class IPyClusterScheduler(_ActorRunner):
 
     def init_cluster(self, *args, **kwargs):
         '''Get a connection (view) to an IPython cluster
+
+        Args:
+            *args: passed to ipyparallel.Client(*args, **kwargs)
+            **kwargs: passed to ipyparallel.Client(*args, **kwargs)
         '''
 
         from ipyparallel import Client
@@ -164,6 +175,8 @@ class IPyClusterScheduler(_ActorRunner):
                 # process result
                 # raise RemoteException in case of failure
                 result = job.get()
+                if self.display_outputs:
+                    job.display_outputs()
                 if result:
                     # empty results don't need any processing
                     out_names = actor.outports.keys()

@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from collections import deque
 import threading
 import warnings
@@ -104,18 +105,41 @@ class LinearizedScheduler(_ActorRunner):
                 self.run_actor(in_port.owner)
 
 
+class _IPySystemJob(object):
+    """
+    System (local run) IPython parallel like job
+    """
+    def __init__(self, actor, *args, **kwargs):
+        self.actor = actor
+        self.args = args
+        self.kwargs = kwargs
+
+    def ready(self):
+        return True
+
+    def get(self):
+        return self.actor.run(*self.args, **self.kwargs)
+
+
 class IPyClusterScheduler(_ActorRunner):
     """
     Scheduler using IPython Cluster.
+
+    Args:
+        display_outputs (Optional[bool]): display stdout/err from actors
+        *args: passed to self.init_cluster(*args, **kwargs)
+        **kwargs: passed to self.init_cluster(*args, **kwargs)
+
     """
 
-    def __init__(self, profile=None):
+    def __init__(self, *args, **kwargs):
         self.process_pool = []
         # actor: job
+        self.display_outputs = kwargs.pop('display_outputs', False)
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
-        self.init_cluster(profile)
+        self.init_cluster(*args, **kwargs)
 
     def copy(self):
         return self.__class__(max_procs=self.max_procs)
@@ -123,13 +147,17 @@ class IPyClusterScheduler(_ActorRunner):
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))
 
-    def init_cluster(self, profile):
+    def init_cluster(self, *args, **kwargs):
         '''Get a connection (view) to an IPython cluster
+
+        Args:
+            *args: passed to ipyparallel.Client(*args, **kwargs)
+            **kwargs: passed to ipyparallel.Client(*args, **kwargs)
         '''
 
-        from IPython.parallel import Client
+        from ipyparallel import Client
 
-        self._ipy_rc = Client(profile=profile)
+        self._ipy_rc = Client(*args, **kwargs)
         self._ipy_dv = self._ipy_rc[:]
         self._ipy_lv = self._ipy_rc.load_balanced_view()
 
@@ -147,6 +175,8 @@ class IPyClusterScheduler(_ActorRunner):
                 # process result
                 # raise RemoteException in case of failure
                 result = job.get()
+                if self.display_outputs:
+                    job.display_outputs()
                 if result:
                     # empty results don't need any processing
                     out_names = actor.outports.keys()
@@ -191,7 +221,11 @@ class IPyClusterScheduler(_ActorRunner):
         # print("Run actor {}".format(actor))
         actor.scheduler = self
         args, kwargs = actor.get_run_args()
-        return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+        # system actors must be run within this process
+        if actor.system_actor:
+            return _IPySystemJob(actor, *args, **kwargs)
+        else:
+            return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
 
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):

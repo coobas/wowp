@@ -1,7 +1,12 @@
+from __future__ import absolute_import, division, print_function
 from ..components import Actor
+from future.builtins import super
 
 
 class Concat(Actor):
+
+    _system_actor = True
+
     def __init__(self, n_ports, name='concat'):
         super().__init__(name=name)
         for i in range(n_ports):
@@ -48,6 +53,8 @@ class Map(Actor):
         in (iterable): contains items to be passed to the mapped actor
         out (tuple): items after applying the map actor
     """
+
+    _system_actor = True
 
     def __init__(self, actor, args=(), kwargs={}, scheduler=None, name='map'):
         super().__init__(name=name)
@@ -98,4 +105,26 @@ class Map(Actor):
         # result = (actor.outports[outport_name].pop() for actor in map_actors)
         result = concat_actor.outports['out'].pop()
 
-        return result
+        return {'out': result}
+
+
+class PassWID(Actor):
+    """
+    Pass input argument with hostname and process ID attached
+    """
+    def __init__(self, name='passwid'):
+        super().__init__(name=name)
+        self.inports.append('inp')
+        self.outports.append('out')
+
+    def get_run_args(self):
+        return (self.inports['inp'].pop(), ), {}
+
+    @staticmethod
+    def run(*args, **kwargs):
+        from os import getpid
+        from socket import gethostname
+        return {'out':
+                    {'inp': args[0],
+                     'host': gethostname(),
+                     'pid': getpid()}}

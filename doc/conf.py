@@ -16,7 +16,10 @@
 # from http://blog.rtwilson.com/how-to-make-your-sphinx-documentation-compile-with-readthedocs-when-youre-using-numpy-and-scipy/
 import sys
 import os
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 MOCK_MODULES = []
 for mod_name in MOCK_MODULES:
@@ -70,7 +73,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'wowp'
-copyright = '2015, Jakub Urban, Jan Pipek'
+copyright = '2015-16, Jakub Urban, Jan Pipek'
 import wowp
 
 # The version info for the project you're documenting, acts as replacement for
@@ -268,7 +271,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'wowp', 'wowp Documentation',
-   'Jakub Urban, Jan Pipek', 'wowp', 'One line description of project.',
+   'Jakub Urban, Jan Pipek', 'wowp', 'Data-flow-actors-based workflow framework',
    'Miscellaneous'),
 ]
 

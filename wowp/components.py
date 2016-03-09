@@ -1,11 +1,14 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from .util import ListDict, deprecated
 from collections import deque
-from . import logger
+from .logger import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
 from warnings import warn
+import future
+from future.builtins import super
 
 __all__ = "Component", "Actor", "Workflow", "Composite", "draw_graph"
 
@@ -125,12 +128,12 @@ class Component(object):
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any input: {} ({})'.format(
+                warn('Component without any output: {} ({})'.format(
                     node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref'
+                raise Exception('{} cannot be an output port'.format(node['ref'
                                                                     ]))
 
         return workflow
@@ -156,6 +159,10 @@ class Actor(Component):
         args, kwargs = self.get_run_args()
         res = self.run(*args, **kwargs)
         return res
+
+    @property
+    def system_actor(self):
+        return getattr(self, '_system_actor', False)
 
 
 class Composite(Component):
@@ -252,6 +259,9 @@ class Ports(object):
         # TODO add security
         self._ports[key] = value
 
+    def __str__(self):
+        return "Ports: [" + ", ".join(self.keys()) + "]"
+
     def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))
@@ -266,6 +276,12 @@ class Ports(object):
 
     def keys(self):
         return list(self._ports.keys())
+
+    def at(self, index):
+        """Get port by number."""
+        key = self.keys()[index]
+        return self[key]
+
 
 
 class Port(object):
@@ -411,7 +427,7 @@ class InPort(Port):
 def is_valid_port_name(name):
     """Validate port name
     """
-    if name.isidentifier() and not keyword.iskeyword(name):
+    if future.utils.isidentifier(name) and not keyword.iskeyword(name):
         return True
     else:
         return False

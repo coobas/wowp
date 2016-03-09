@@ -1,8 +1,17 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 from collections import OrderedDict as _OrderedDict
 import warnings
+import six
+import warnings as _warnings
+import os as _os
+import sys
+from tempfile import mkdtemp
 
 try:
-    from threading import get_ident as _get_ident
+    if six.PY3:
+        from threading import get_ident as _get_ident
+    else:
+        from thread import get_ident as _get_ident
 except ImportError:
     from dummy_threading import get_ident as _get_ident
 
@@ -20,11 +29,11 @@ class ListDict(_OrderedDict):
             self.__insertions_running = {}
         super(ListDict, self).__init__(*args, **kwds)
 
-    def __setitem__(self, key, value, dict_setitem=dict.__setitem__):
+    def __setitem__(self, key, value):
         if _get_ident() in self.__insertions_running:
             self.__insertions_running[_get_ident()] = key, value
         else:
-            super(ListDict, self).__setitem__(key, value, dict_setitem)
+            super(ListDict, self).__setitem__(key, value)
 
     def __insertion(self, link_prev, key_value):
         self.__insertions_running[_get_ident()] = 1
@@ -63,3 +72,96 @@ def deprecated(func):
     new_func.__doc__ = func.__doc__
     new_func.__dict__.update(func.__dict__)
     return new_func
+
+
+class ConstructorWrapper(object):
+    """This can be used as deferred construction call."""
+
+    def __init__(self, klass, *args, **kwargs):
+        self.klass = klass
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self):
+        return self.klass(*self.args, **self.kwargs)
+
+
+class TemporaryDirectory(object):
+    """Create and return a temporary directory.  This has the same
+    behavior as mkdtemp but can be used as a context manager.  For
+    example:
+
+        with TemporaryDirectory() as tmpdir:
+            ...
+
+    Upon exiting the context, the directory and everything contained
+    in it are removed.
+    """
+
+    def __init__(self, suffix="", prefix="tmp", dir=None):
+        self._closed = False
+        self.name = None  # Handle mkdtemp raising an exception
+        self.name = mkdtemp(suffix, prefix, dir)
+
+    def __repr__(self):
+        return "<{} {!r}>".format(self.__class__.__name__, self.name)
+
+    def __enter__(self):
+        return self.name
+
+    def cleanup(self, _warn=False):
+        if self.name and not self._closed:
+            try:
+                self._rmtree(self.name)
+            except (TypeError, AttributeError) as ex:
+                # Issue #10188: Emit a warning on stderr
+                # if the directory could not be cleaned
+                # up due to missing globals
+                if "None" not in str(ex):
+                    raise
+                print("ERROR: {!r} while cleaning up {!r}".format(ex, self,),
+                      file=sys.stderr)
+                return
+            self._closed = True
+            if _warn:
+                self._warn("Implicitly cleaning up {!r}".format(self))
+
+    def __exit__(self, exc, value, tb):
+        self.cleanup()
+
+    def __del__(self):
+        # Issue a ResourceWarning if implicit cleanup needed
+        self.cleanup(_warn=True)
+
+    # XXX (ncoghlan): The following code attempts to make
+    # this class tolerant of the module nulling out process
+    # that happens during CPython interpreter shutdown
+    # Alas, it doesn't actually manage it. See issue #10188
+    _listdir = staticmethod(_os.listdir)
+    _path_join = staticmethod(_os.path.join)
+    _isdir = staticmethod(_os.path.isdir)
+    _islink = staticmethod(_os.path.islink)
+    _remove = staticmethod(_os.remove)
+    _rmdir = staticmethod(_os.rmdir)
+    _warn = _warnings.warn
+
+    def _rmtree(self, path):
+        # Essentially a stripped down version of shutil.rmtree.  We can't
+        # use globals because they may be None'ed out at shutdown.
+        for name in self._listdir(path):
+            fullname = self._path_join(path, name)
+            try:
+                isdir = self._isdir(fullname) and not self._islink(fullname)
+            except OSError:
+                isdir = False
+            if isdir:
+                self._rmtree(fullname)
+            else:
+                try:
+                    self._remove(fullname)
+                except OSError:
+                    pass
+        try:
+            self._rmdir(path)
+        except OSError:
+            pass

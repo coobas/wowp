@@ -1,4 +1,5 @@
 from . import Actor
+from ..schedulers import LinearizedScheduler
 
 
 class GeneratorActor(Actor):
@@ -13,7 +14,8 @@ class GeneratorActor(Actor):
         return GeneratorActor.PseudoDict(self.iterate())
 
     def iterate(self):
-        raise NotImplementedError("It is necessary to implement iterate method that yields pairs key, value")
+        raise NotImplementedError(
+            "It is necessary to implement iterate method that yields pairs key, value")
 
 
 class LineReader(GeneratorActor):
@@ -66,6 +68,50 @@ class Splitter(Actor):
         outport = "%s_%d" % (self.inport_name, i)
         return {outport: value}
 
-
         # TODO: Add SequentialMerger
         # TODO: Add RandomMerger
+
+
+class Chain(Actor):
+    """Chain of actors.
+
+    Each of the chain link has to have just one input & output port (to be changed)
+    """
+
+    def __init__(self, name, actor_generators, **kwargs):
+        """
+
+        :param name:
+        :param actor_generators: iterable of actor classes or generators
+        :param kwargs:
+        :return:
+        """
+        super(Chain, self).__init__(name=name)
+        self.actors = []
+        if len(actor_generators) < 1:
+            raise RuntimeError("Chain needs at least one item.")
+        self.inports.append("inp")
+        self.outports.append("out")
+        self.actor_generators = actor_generators
+
+    def get_run_args(self):
+        return (self.inports["inp"].pop(), ), {"generators": self.actor_generators}
+
+    @staticmethod
+    def run(*args, **kwargs):
+        input = args[0]
+        actor_generators = kwargs.pop("generators")
+        actors = []
+        for generator in actor_generators:
+            actor = generator()
+            assert len(actor.inports) == 1
+            assert len(actor.outports) == 1
+            if actors:
+                inport = actor.inports.at(0)
+                inport += actors[-1].outports.at(0)
+            actors.append(actor)
+
+        scheduler = LinearizedScheduler()
+        scheduler.put_value(actors[0].inports.at(0), input)
+        scheduler.execute()
+        return {"out": actors[-1].outports.at(0).pop()}

@@ -54,6 +54,9 @@ Tutorials
    Tutorial/Custom actors
    Tutorial/IPython.parallel scheduler
    Tutorial/Generator actor
+   Tutorial/Massive tree workflow
+   Tutorial/Map parallel
+   Tutorial/Map-Chain
 
 
 Reference

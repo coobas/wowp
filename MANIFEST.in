@@ -1,0 +1,7 @@
+include _wowp_setup.py
+include *.rst
+include LICENSE.txt
+include requirements.txt
+include README.txt
+prune notebooks
+prune doc

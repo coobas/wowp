@@ -1,13 +1,7 @@
 '''WOWP -- A WOrkfloW Framework in Python
 '''
-
-__version__ = '0.0.2'
-__release__ = __version__ + '-alpha'
-
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from __future__ import absolute_import, division, print_function, unicode_literals
+from .__about__ import __version__, __release__
 
 from .components import Component, Actor, Workflow
 from . import actors

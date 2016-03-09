@@ -1,5 +1,8 @@
-from wowp.actors.experimental import Splitter
+from __future__ import absolute_import, division, print_function, unicode_literals
+from wowp.actors.experimental import Splitter, Chain
 from wowp.schedulers import NaiveScheduler
+from wowp.actors import FuncActor
+from wowp.util import ConstructorWrapper
 
 
 def test_splitter():
@@ -19,3 +22,19 @@ def test_splitter():
 
     assert [0, 2, 4, 6, 8] == x1_all
     assert [1, 3, 5, 7, 9] == x2_all
+
+
+def double_me(x):
+    return x * 2
+
+
+def test_chain():
+    func_generator = ConstructorWrapper(FuncActor, double_me)
+    chain = Chain("func_chain", [func_generator, func_generator])
+    wf = chain.get_workflow()
+    res = wf(inp=4)
+    assert res["out"].pop() == 16
+    res = wf(inp=2)
+    assert res["out"].pop() == 8
+    res = wf(inp="a")
+    assert res["out"].pop() == "aaaa"

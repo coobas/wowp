@@ -120,6 +120,9 @@ class _IPySystemJob(object):
     def get(self):
         return self.actor.run(*self.args, **self.kwargs)
 
+    def display_outputs(self):
+        pass
+
 
 class IPyClusterScheduler(_ActorRunner):
     """

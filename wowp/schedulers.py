@@ -126,7 +126,9 @@ class IPyClusterScheduler(_ActorRunner):
     Scheduler using IPython Cluster.
 
     Args:
-        display_outputs (Optional[bool]): display stdout/err from actors
+        display_outputs (Optional[bool]): display stdout/err from actors [False]
+        timeout (Optional): timeout in secs for waiting for ipyparallel cluster [60]
+        min_engines (Optional[int]): minimum number of engines [1]
         *args: passed to self.init_cluster(*args, **kwargs)
         **kwargs: passed to self.init_cluster(*args, **kwargs)
 
@@ -136,6 +138,8 @@ class IPyClusterScheduler(_ActorRunner):
         self.process_pool = []
         # actor: job
         self.display_outputs = kwargs.pop('display_outputs', False)
+        self.timeout = kwargs.pop('timeout', 60)
+        self.min_engines = kwargs.pop('min_engines', 1)
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
@@ -156,8 +160,33 @@ class IPyClusterScheduler(_ActorRunner):
         '''
 
         from ipyparallel import Client
+        import time
 
-        self._ipy_rc = Client(*args, **kwargs)
+        maxtime = time.time() + self.timeout
+
+        while True:
+            try:
+                cli = Client(*args, **kwargs)
+            except Exception as e:
+                if time.time() > maxtime:
+                    # raise the original exception from ipyparallel
+                    raise e
+                else:
+                    # sleep and try again to get the client
+                    time.sleep(self.timeout * 0.1)
+                    continue
+            if len(cli.ids) >= self.min_engines:
+                # we have enough clients
+                break
+            else:
+                # free the client
+                cli.close()
+            if time.time() > maxtime:
+                raise Exception('Not enough ipyparallel clients')
+            # try ~10 times
+            time.sleep(self.timeout * 0.1)
+
+        self._ipy_rc = cli
         self._ipy_dv = self._ipy_rc[:]
         self._ipy_lv = self._ipy_rc.load_balanced_view()
 

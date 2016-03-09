@@ -6,6 +6,7 @@ import six
 
 __all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge']
 
+
 class FuncActor(Actor):
     """Actor defined simply by a function
 
@@ -49,9 +50,9 @@ class FuncActor(Actor):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('inp',)
+                inports = ('inp', )
             elif isinstance(inports, six.string_types):
-                inports = (inports,)
+                inports = (inports, )
         # save func as attribute
         self.func = func
         self._func_args = args
@@ -61,9 +62,9 @@ class FuncActor(Actor):
             self.inports.append(name)
         # setup outports
         if outports is None:
-            outports = ('out',)
+            outports = ('out', )
         elif isinstance(outports, six.string_types):
-            outports = (outports,)
+            outports = (outports, )
         for name in outports:
             self.outports.append(name)
 
@@ -85,7 +86,7 @@ class FuncActor(Actor):
         outports = kwargs['outports']
 
         if len(outports) == 1:
-            func_res = (func_res,)
+            func_res = (func_res, )
         # iterate over ports and return values
         res = {name: value for name, value in zip(outports, func_res)}
         return res
@@ -171,7 +172,7 @@ class ShellRunner(Actor):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
-            self.base_command = (base_command,)
+            self.base_command = (base_command, )
         else:
             self.base_command = base_command
 
@@ -192,11 +193,11 @@ class ShellRunner(Actor):
     def get_run_args(self):
         vals = self.inports['inp'].pop()
         if self.format_inp == 'args':
-            args = (self.base_command[0].format(*vals),)
+            args = (self.base_command[0].format(*vals), )
         elif self.format_inp == 'kwargs':
-            args = (self.base_command[0].format(**vals),)
+            args = (self.base_command[0].format(**vals), )
         elif isinstance(vals, six.string_types):
-            args = self.base_command + (vals,)
+            args = self.base_command + (vals, )
         else:
             args = self.base_command + vals
         kwargs = {
@@ -222,7 +223,8 @@ class ShellRunner(Actor):
         else:
             mode = "w+t"
 
-        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
+        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(
+                mode=mode) as ferr:
             if kwargs['shell']:
 
                 executable = kwargs['shell']

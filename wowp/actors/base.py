@@ -3,10 +3,8 @@ from ..components import Actor
 import inspect
 import itertools
 import six
-import sys
 
 __all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge']
-
 
 class FuncActor(Actor):
     """Actor defined simply by a function
@@ -214,6 +212,7 @@ class ShellRunner(Actor):
     def run(*args, **kwargs):
         import subprocess
         import tempfile
+        import sys
 
         if kwargs['debug_print']:
             print('run command:\n{}'.format(' '.join(args)))

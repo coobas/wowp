@@ -3,7 +3,7 @@ from ..components import Actor
 import inspect
 import itertools
 import six
-
+import sys
 
 __all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge']
 
@@ -51,9 +51,9 @@ class FuncActor(Actor):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
             if inports is None:
-                inports = ('inp', )
+                inports = ('inp',)
             elif isinstance(inports, six.string_types):
-                inports = (inports, )
+                inports = (inports,)
         # save func as attribute
         self.func = func
         self._func_args = args
@@ -63,9 +63,9 @@ class FuncActor(Actor):
             self.inports.append(name)
         # setup outports
         if outports is None:
-            outports = ('out', )
+            outports = ('out',)
         elif isinstance(outports, six.string_types):
-            outports = (outports, )
+            outports = (outports,)
         for name in outports:
             self.outports.append(name)
 
@@ -87,7 +87,7 @@ class FuncActor(Actor):
         outports = kwargs['outports']
 
         if len(outports) == 1:
-            func_res = (func_res, )
+            func_res = (func_res,)
         # iterate over ports and return values
         res = {name: value for name, value in zip(outports, func_res)}
         return res
@@ -153,10 +153,12 @@ class ShellRunner(Actor):
         base_command: the command to be run, may be a template
         binary: input/output in binary mode
         shell: shell parameter in subprocess.call
+               if it's a string then it indicates the executable parameter in subprocess.call
         format_inp: 'args' triggers base_command.format(*inp),
                     'kwargs' triggers base_command.format(**inp)
         single_out: join outputs into a single dict
         debug_print: print debug info
+        print_output: print standard output and standard error
     """
 
     def __init__(self,
@@ -166,11 +168,12 @@ class ShellRunner(Actor):
                  shell=False,
                  format_inp=False,
                  single_out=False,
+                 print_output=False,
                  debug_print=False):
         super(ShellRunner, self).__init__(name=name)
 
         if isinstance(base_command, six.string_types):
-            self.base_command = (base_command, )
+            self.base_command = (base_command,)
         else:
             self.base_command = base_command
 
@@ -180,6 +183,7 @@ class ShellRunner(Actor):
         self.inports.append('inp')
         self.single_out = single_out
         self.debug_print = debug_print
+        self.print_output = print_output
         if single_out:
             self.outports.append('out')
         else:
@@ -190,11 +194,11 @@ class ShellRunner(Actor):
     def get_run_args(self):
         vals = self.inports['inp'].pop()
         if self.format_inp == 'args':
-            args = (self.base_command[0].format(*vals), )
+            args = (self.base_command[0].format(*vals),)
         elif self.format_inp == 'kwargs':
-            args = (self.base_command[0].format(**vals), )
+            args = (self.base_command[0].format(**vals),)
         elif isinstance(vals, six.string_types):
-            args = self.base_command + (vals, )
+            args = self.base_command + (vals,)
         else:
             args = self.base_command + vals
         kwargs = {
@@ -202,6 +206,7 @@ class ShellRunner(Actor):
             'binary': self.binary,
             'single_out': self.single_out,
             'debug_print': self.debug_print,
+            'print_output': self.print_output,
         }
         return args, kwargs
 
@@ -218,12 +223,17 @@ class ShellRunner(Actor):
         else:
             mode = "w+t"
 
-        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(
-                mode=mode) as ferr:
+        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(mode=mode) as ferr:
             if kwargs['shell']:
+
+                executable = kwargs['shell']
+                if not isinstance(kwargs['shell'], six.string_types):
+                    executable = None
+
                 result = subprocess.call(' '.join(args),
                                          stdout=fout,
                                          stderr=ferr,
+                                         executable=executable,
                                          shell=kwargs['shell'])
             else:
                 result = subprocess.call(args,
@@ -237,6 +247,9 @@ class ShellRunner(Actor):
         res = {'ret': result, 'stdout': cout, 'stderr': cerr}
         if kwargs['debug_print']:
             print('result:\n{}'.format(res))
+        if kwargs['print_output']:
+            sys.stdout.write(cout)
+            sys.stderr.write(cerr)
         if kwargs['single_out']:
             res = {'out': res}
         return res

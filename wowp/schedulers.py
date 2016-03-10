@@ -140,6 +140,8 @@ class IPyClusterScheduler(_ActorRunner):
     def __init__(self, *args, **kwargs):
         self.process_pool = []
         # actor: job
+        self._init_args = args
+        self._init_kwargs = kwargs
         self.display_outputs = kwargs.pop('display_outputs', False)
         self.timeout = kwargs.pop('timeout', 60)
         self.min_engines = kwargs.pop('min_engines', 1)
@@ -149,7 +151,7 @@ class IPyClusterScheduler(_ActorRunner):
         self.init_cluster(*args, **kwargs)
 
     def copy(self):
-        return self.__class__(max_procs=self.max_procs)
+        return self.__class__(*self._init_args, **self._init_kwargs)
 
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))

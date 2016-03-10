@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 from ..components import Actor
+from ..schedulers import _ActorRunner, ThreadedScheduler
 from future.builtins import super
 
 
@@ -73,9 +74,13 @@ class Map(Actor):
         # bacause it needs to change the workflow
         if self.map_scheduler is None:
             # self.schduler is set by the calling scheduler
-            map_scheduler = self.scheduler
+            map_scheduler = self.scheduler.copy()
+        elif isinstance(self.map_scheduler, (_ActorRunner, ThreadedScheduler)):
+            # we need a copy of an existing scheduler
+            map_scheduler = self.map_scheduler.copy()
         else:
-            map_scheduler = self.map_scheduler
+            # in this case, we assume self.map_scheduler is a class
+            map_scheduler = self.map_scheduler()
         destinations = [port for port in self.outports['out'].connections]
         # disconnect the output port
         # for port in destinations:

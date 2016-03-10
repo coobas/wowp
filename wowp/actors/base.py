@@ -196,6 +196,8 @@ class ShellRunner(Actor):
             args = (self.base_command[0].format(*vals), )
         elif self.format_inp == 'kwargs':
             args = (self.base_command[0].format(**vals), )
+        elif self.format_inp == 'trigger':
+            args = self.base_command
         elif isinstance(vals, six.string_types):
             args = self.base_command + (vals, )
         else:

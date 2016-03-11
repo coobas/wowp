@@ -203,6 +203,8 @@ class IPyClusterScheduler(_ActorRunner):
             self._try_empty_execution_queue()
             self._try_empty_wait_queue()
             self._try_empty_ready_jobs()
+            # TODO shall we sleep here?
+            # could also use ipyparallel callbacks
 
     def _try_empty_ready_jobs(self):
         pending = {}  # temporary container

@@ -3,6 +3,11 @@ from collections import deque
 import threading
 import warnings
 import wowp.components
+import time
+try:
+    from ipyparallel import Client, RemoteError
+except ImportError:
+    warnings.warn('ipyparallel not installed: IPyClusterScheduler cannot be used')
 
 
 class _ActorRunner(object):
@@ -163,9 +168,6 @@ class IPyClusterScheduler(_ActorRunner):
             *args: passed to ipyparallel.Client(*args, **kwargs)
             **kwargs: passed to ipyparallel.Client(*args, **kwargs)
         '''
-
-        from ipyparallel import Client
-        import time
 
         maxtime = time.time() + self.timeout
 

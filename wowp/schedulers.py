@@ -206,11 +206,16 @@ class IPyClusterScheduler(_ActorRunner):
 
     def _try_empty_ready_jobs(self):
         pending = {}  # temporary container
-        for actor, job in self.running_actors.items():
+        for actor, job_description in self.running_actors.items():
+            job = job_description['job']
             if job.ready():
                 # process result
-                # raise RemoteException in case of failure
-                result = job.get()
+                # raise RemoteError in case of failure
+                try:
+                    result = job.get()
+                except RemoteError:
+                    print('actor {} failed'.format(job_description['actor'].name))
+                    raise
                 if self.display_outputs:
                     job.display_outputs()
                 if result:
@@ -230,7 +235,7 @@ class IPyClusterScheduler(_ActorRunner):
                                 name))
 
             else:
-                pending[actor] = job
+                pending[actor] = job_description
         self.running_actors = pending
 
     def _try_empty_wait_queue(self):
@@ -258,10 +263,13 @@ class IPyClusterScheduler(_ActorRunner):
         actor.scheduler = self
         args, kwargs = actor.get_run_args()
         # system actors must be run within this process
+        res = dict(args=args, kwargs=kwargs)
         if actor.system_actor:
-            return _IPySystemJob(actor, *args, **kwargs)
+            res['job'] = _IPySystemJob(actor, *args, **kwargs)
         else:
-            return self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+            res['job'] = self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+
+        return res
 
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):

@@ -238,6 +238,8 @@ class IPyClusterScheduler(_ActorRunner):
 
             else:
                 pending[actor] = job_description
+        # TODO temporary fix against spanning ipyparallel - NOT A GOOD WAY!
+        time.sleep(0.1)
         self.running_actors = pending
 
     def _try_empty_wait_queue(self):

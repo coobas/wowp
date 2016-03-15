@@ -104,23 +104,10 @@ def _shell_run(command,
             sys.stdout.write(cout)
             sys.stderr.write(cerr)
 
-        # link back output files
+        # get output file names (abspaths)
         if isinstance(files_out, six.string_types):
             files_out = (files_out, )
-        # output_file_names = []
-        # for out_glob in files_out:
-        #     for out_file_name in glob(os.path.join(tmpdir, out_glob)):
-        #         # TODO what about subdirectories?
-        #         source = os.path.join(tmpdir, os.path.basename(out_file_name))
-        #         target = os.path.join(workdir, os.path.basename(out_file_name))
-        #         if os.path.exists(target):
-        #             # rename output file if it already exists
-        #             # this means there was a CONFLICT
-        #             target = target + '_' + os.path.basename(tmpdir)
-        #         os.link(source, target)
-        #         output_file_names.append(target)
         output_file_names = [os.path.join(tmpdir, fout) for fout in files_out]
-
 
     finally:
         # TODO clean up tmpdir ???
@@ -134,23 +121,24 @@ def _shell_run(command,
     return res
 
 
-class TOQ(Actor):
+class FileCommand(Actor):
     def __init__(self,
-                 name='TOQ',
-                 command='toq.x',
+                 name=None,
+                 command='false',
                  input_files=(),
                  output_files=(),
                  workdir=None,
                  shell='/bin/bash',
                  print_output=True,
                  timeout=None):
-        super(TOQ, self).__init__(name=name)
+        super(FileCommand, self).__init__(name=name)
 
         # use input and output file names as ports
         if isinstance(input_files, six.string_types):
             input_files = (input_files, )
         if isinstance(output_files, six.string_types):
             output_files = (output_files, )
+        # TODO this fails for file names that are not valid identifier strings (e.g. contain .)
         for in_file in input_files:
             self.inports.append(in_file)
         for out_file in output_files:
@@ -169,12 +157,6 @@ class TOQ(Actor):
             files_in.append((os.path.abspath(inport.pop()), inport.name))
         for outport in self.outports:
             files_out.append(outport.name)
-        # assume working directory is the one that contains the input file
-        # if files_in and os.path.isdir(os.path.dirname(files_in[0][0])):
-        #     workdir = os.path.abspath(os.path.dirname(files_in[0][0]))
-        # else:
-        #     # this will create a new workdir
-        #     workdir = None
         args = ()
         kwargs = {'files_in': files_in,
                   'files_out': files_out,
@@ -191,24 +173,44 @@ class TOQ(Actor):
         shell_res = _shell_run(kwargs['command'],
                                kwargs['workdir'],
                                files_in=kwargs['files_in'],
-                               files_out='toq_out',
+                               files_out=kwargs['files_out'],
                                timeout=kwargs['timeout'],
                                shell=kwargs['shell'],
                                print_output=True,
                                binary_mode=False)
 
-        # possibly look at shell_res
+        # possibly look at shell_res here (for error etc)
 
         if shell_res['ret'] != 0:
             raise Exception('error running toq')
 
-        # res = {'toq_out': os.path.join(kwargs['workdir'], 'toq_out')}
-        res = {'toq_out': shell_res['output_file_names']}
+        res = {}
+        for name, path in zip(kwargs['files_out'], shell_res['output_file_names']):
+            res[name] = path
         return res
 
 
-class ELITE(Actor):
-    def __init__(self, name=None, elite_params=None):
-        super(Rand, self).__init__(name=name)
-        self.inports.append('toq_out')
-        self.outports.append('elite_out')
+def how_to_test():
+    from tempfile import mkdtemp
+    workdir = mkdtemp()
+    print('running in {}'.format(workdir))
+    input_file_name = 'my_input_file'
+    output_file_name = 'my_output_file'
+    open(os.path.join(workdir, input_file_name), 'w').write('This is my input file :-P')
+
+    from wowp.actors.omfit import FileCommand
+
+    command = 'echo "I am TOQ" > {output}; cat {input} >> {output}'.format(
+        input=input_file_name,
+        output=output_file_name)
+
+    toq = FileCommand(command=command,
+                      input_files=input_file_name,
+                      output_files=output_file_name,
+                      workdir=workdir,
+                      timeout=None)
+
+    kwargs = {input_file_name: os.path.join(workdir, input_file_name)}
+    res = toq(**kwargs)
+    print('output file content:')
+    print(open(res[output_file_name]).read())

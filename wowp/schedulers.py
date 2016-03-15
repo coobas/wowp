@@ -4,6 +4,7 @@ import threading
 import warnings
 import wowp.components
 import time
+from .logger import logger
 try:
     from ipyparallel import Client, RemoteError
 except ImportError:
@@ -114,6 +115,7 @@ class _IPySystemJob(object):
     """
     System (local run) IPython parallel like job
     """
+
     def __init__(self, actor, *args, **kwargs):
         self.actor = actor
         self.args = args
@@ -209,14 +211,43 @@ class IPyClusterScheduler(_ActorRunner):
     def _try_empty_ready_jobs(self):
         pending = {}  # temporary container
         for actor, job_description in self.running_actors.items():
+
             job = job_description['job']
+
+            if 'started' not in job_description:
+                # log the started time
+                if job_description['job'].started:
+                    job_description['started'] = job_description['job'].started
+                    job_description['engine'] = job_description['job'].engine_id
+                    logger.debug('started {started} actor {actor}({args}, {kwargs})'
+                                 ' on engine {engine}'.format(actor=actor.name,
+                                                              **job_description))
             if job.ready():
+                if 'started' not in job_description:
+                    # log the started time
+                    if job_description['job'].started:
+                        job_description['started'] = job_description['job'].started
+                        job_description['engine'] = job_description['job'].engine_id
+                        logger.debug('started {started} actor {actor}({args}, {kwargs})'
+                                     ' on engine {engine} at {started}'.format(
+                                         actor=actor.name,
+                                         **job_description))
+
+                if 'completed' not in job_description:
+                    # log the started time
+                    if job_description['job'].started:
+                        job_description['completed'] = job_description['job'].started
+                        logger.debug('completed actor {actor} at {completed}'.format(
+                            actor=actor.name,
+                            **job_description))
+
                 # process result
                 # raise RemoteError in case of failure
                 try:
                     result = job.get()
                 except RemoteError:
-                    print('actor {} failed'.format(job_description['actor'].name))
+                    logger.error('actor {} failed\n{}'.format(actor.name,
+                                 job_description['job'].error))
                     raise
                 if self.display_outputs:
                     job.display_outputs()
@@ -224,17 +255,15 @@ class IPyClusterScheduler(_ActorRunner):
                     # empty results don't need any processing
                     out_names = actor.outports.keys()
                     if not hasattr(result, 'items'):
-                        raise ValueError(
-                            'The execute method must return '
-                            'a dict-like object with items method')
+                        raise ValueError('The execute method must return '
+                                         'a dict-like object with items method')
                     for name, value in result.items():
                         if name in out_names:
                             outport = actor.outports[name]
                             outport.put(value)
                             self.on_outport_put_value(outport)
                         else:
-                            raise ValueError("{} not in output ports".format(
-                                name))
+                            raise ValueError("{} not in output ports".format(name))
 
             else:
                 pending[actor] = job_description
@@ -272,6 +301,8 @@ class IPyClusterScheduler(_ActorRunner):
             res['job'] = _IPySystemJob(actor, *args, **kwargs)
         else:
             res['job'] = self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+
+        logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
 
         return res
 

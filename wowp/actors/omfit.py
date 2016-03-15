@@ -12,6 +12,7 @@ def _shell_run(command,
                files_in=(),
                files_out=(),
                timeout=None,
+               cleanup=False,
                shell='/bin/bash',
                print_output=True,
                binary_mode=False):
@@ -104,33 +105,46 @@ def _shell_run(command,
             sys.stdout.write(cout)
             sys.stderr.write(cerr)
 
-        # get output file names (abspaths)
-        if isinstance(files_out, six.string_types):
-            files_out = (files_out, )
-        output_file_names = [os.path.join(tmpdir, fout) for fout in files_out]
-
     finally:
-        # TODO clean up tmpdir ???
-        pass
+        # cleanup the temp directory
+        if cleanup:
+            for fname in os.listdir(tmpdir):
+                if fname not in files_out:
+                    os.remove(os.path.join(tmpdir, fname))
 
     res = {'ret': result,
            'stdout': cout,
            'stderr': cerr,
-           'output_file_names': output_file_names}
+           'tmpdir': tmpdir}
 
     return res
 
 
 class FileCommand(Actor):
+    """Use shell command to process files
+
+    Args:
+        name (str): the actor name
+        command (str): the command to be executed
+        input_files: a list of (file_name, port_name) mappings
+        output_files: a list of (file_name, port_name) mappings
+        workdir (str): where temporary directories will be created
+        shell(str): the shell path [/bin/bash]
+        print_output (bool): print the std out/err [True]
+        timeout (float): maximum run time for the executable
+        cleanup (bool): cleanup temporary directories
+    """
+
     def __init__(self,
-                 name=None,
-                 command='false',
+                 name,
+                 command,
                  input_files=(),
                  output_files=(),
                  workdir=None,
                  shell='/bin/bash',
                  print_output=True,
-                 timeout=None):
+                 timeout=None,
+                 cleanup=False):
         super(FileCommand, self).__init__(name=name)
 
         # use input and output file names as ports
@@ -138,32 +152,51 @@ class FileCommand(Actor):
             input_files = (input_files, )
         if isinstance(output_files, six.string_types):
             output_files = (output_files, )
-        # TODO this fails for file names that are not valid identifier strings (e.g. contain .)
+        # map of port name -> file name
+        self.inports_map = {}
+        self.outports_map = {}
         for in_file in input_files:
-            self.inports.append(in_file)
+            if isinstance(in_file, six.string_types):
+                file_name, port_name = in_file, in_file
+            else:
+                file_name, port_name = in_file
+            self.inports_map[port_name] = file_name
+            self.inports.append(port_name)
         for out_file in output_files:
-            self.outports.append(out_file)
+            if isinstance(out_file, six.string_types):
+                file_name, port_name = out_file, out_file
+            else:
+                file_name, port_name = out_file
+            self.outports_map[port_name] = file_name
+            self.outports.append(port_name)
 
         self.command = command
         self.workdir = workdir
         self.shell = shell
         self.timeout = timeout
+        self.cleanup = cleanup
 
     def get_run_args(self):
-        # get the input file name
+        # get the input file names
         files_in = []
         files_out = []
-        for inport in self.inports:
-            files_in.append((os.path.abspath(inport.pop()), inport.name))
-        for outport in self.outports:
-            files_out.append(outport.name)
+        # for inport in self.inports:
+        #     files_in.append((os.path.abspath(inport.pop()), self.inports_map[inport.name]))
+        # for outport in self.outports:
+        #     files_out.append(self.outports_map[outport.name])
+        for port_name, file_name in self.inports_map.items():
+            files_in.append((os.path.abspath(self.inports[port_name].pop()),
+                             file_name))
+        for port_name, file_name in self.outports_map.items():
+            files_out.append(file_name)
         args = ()
         kwargs = {'files_in': files_in,
-                  'files_out': files_out,
+                  'outports_map': self.outports_map,
                   'workdir': self.workdir,
                   'command': self.command,
                   'shell': self.shell,
-                  'timeout': self.timeout}
+                  'timeout': self.timeout,
+                  'cleanup': self.cleanup}
 
         return args, kwargs
 
@@ -173,10 +206,11 @@ class FileCommand(Actor):
         shell_res = _shell_run(kwargs['command'],
                                kwargs['workdir'],
                                files_in=kwargs['files_in'],
-                               files_out=kwargs['files_out'],
+                               files_out=kwargs['outports_map'].values(),
                                timeout=kwargs['timeout'],
                                shell=kwargs['shell'],
                                print_output=True,
+                               cleanup=kwargs['cleanup'],
                                binary_mode=False)
 
         # possibly look at shell_res here (for error etc)
@@ -184,9 +218,10 @@ class FileCommand(Actor):
         if shell_res['ret'] != 0:
             raise Exception('error running toq')
 
+        # puth output file names into output ports
         res = {}
-        for name, path in zip(kwargs['files_out'], shell_res['output_file_names']):
-            res[name] = path
+        for port_name, file_name in kwargs['outports_map'].items():
+            res[port_name] = os.path.join(shell_res['tmpdir'], file_name)
         return res
 
 
@@ -194,9 +229,12 @@ def how_to_test():
     from tempfile import mkdtemp
     workdir = mkdtemp()
     print('running in {}'.format(workdir))
-    input_file_name = 'my_input_file'
-    output_file_name = 'my_output_file'
-    open(os.path.join(workdir, input_file_name), 'w').write('This is my input file :-P')
+    input_file_name_tmp = 'my_input_file_tmp.txt'
+    input_file_name = 'my_input_file.txt'
+    input_port_name = 'my_input'
+    output_file_name = 'my_output_file.txt'
+    output_port_name = 'my_output'
+    open(os.path.join(workdir, input_file_name_tmp), 'w').write('This is my input file :-P')
 
     from wowp.actors.omfit import FileCommand
 
@@ -204,13 +242,15 @@ def how_to_test():
         input=input_file_name,
         output=output_file_name)
 
-    toq = FileCommand(command=command,
-                      input_files=input_file_name,
-                      output_files=output_file_name,
+    toq = FileCommand('toq_actor',
+                      command=command,
+                      input_files=((input_file_name, input_port_name), ),
+                      output_files=((output_file_name, output_port_name), ),
                       workdir=workdir,
-                      timeout=None)
+                      timeout=None,
+                      cleanup=True)
 
-    kwargs = {input_file_name: os.path.join(workdir, input_file_name)}
+    kwargs = {input_port_name: os.path.join(workdir, input_file_name_tmp)}
     res = toq(**kwargs)
     print('output file content:')
-    print(open(res[output_file_name]).read())
+    print(open(res[output_port_name]).read())

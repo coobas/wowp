@@ -21,6 +21,7 @@ def _shell_run(command,
     import sys
     from tempfile import mkdtemp
     from glob import glob
+    import time
 
     if workdir is None:
         # TODO handle creating new workdirs
@@ -61,19 +62,8 @@ def _shell_run(command,
             logger.error('Error linking input files')
             raise
 
-        # construct the full command, including timeout if provided
-        if timeout is not None:
-            # TODO use Pythonic timeout rather than spawn
-            full_command = ('''
-    cd {}
-    expect << EOF
-    set timeout {}
-    spawn {}
-    expect eof
-    EOF
-    ''').format(tmpdir, timeout, command)
-        else:
-            full_command = ('cd {}\n{}\n').format(tmpdir, command)
+        # construct the full command
+        full_command = ('cd {}\n{}\n').format(tmpdir, command)
 
         if print_output:
             print('run command:\n{}'.format(full_command))
@@ -83,19 +73,46 @@ def _shell_run(command,
         else:
             mode = "w+t"
 
-        with tempfile.TemporaryFile(mode=mode) as fout, tempfile.TemporaryFile(
-                mode=mode) as ferr:
+        with tempfile.NamedTemporaryFile(mode=mode,
+                                         prefix='stdout',
+                                         dir=tmpdir) as fout, tempfile.NamedTemporaryFile(
+                                             mode=mode,
+                                             prefix='stderr',
+                                             dir=tmpdir) as ferr:
 
             if not isinstance(shell, six.string_types):
                 executable = None
             else:
                 executable = shell
 
-            result = subprocess.call(full_command,
-                                     stdout=fout,
-                                     stderr=ferr,
-                                     executable=executable,
-                                     shell=True)
+            if timeout is None:
+                result = subprocess.call(full_command,
+                                         stdout=fout,
+                                         stderr=ferr,
+                                         executable=executable,
+                                         shell=True)
+            else:
+                maxtime = time.time() + timeout
+                proc = subprocess.Popen(full_command,
+                                        executable=executable,
+                                        stdout=fout,
+                                        stderr=ferr,
+                                        shell=True)
+                while proc.poll() is None:
+                    time.sleep(timeout * 0.01)
+                    if time.time() > maxtime:
+                        proc.terminate()
+                        if print_output:
+                            fout.seek(0)
+                            ferr.seek(0)
+                            cout = fout.read()
+                            cerr = ferr.read()
+                            sys.stdout.write(cout)
+                            sys.stderr.write(cerr)
+                        raise Exception('time out expired in {}'.format(full_command))
+
+                result = proc.returncode
+
             fout.seek(0)
             ferr.seek(0)
             cout = fout.read()
@@ -112,10 +129,7 @@ def _shell_run(command,
                 if fname not in files_out:
                     os.remove(os.path.join(tmpdir, fname))
 
-    res = {'ret': result,
-           'stdout': cout,
-           'stderr': cerr,
-           'tmpdir': tmpdir}
+    res = {'ret': result, 'stdout': cout, 'stderr': cerr, 'tmpdir': tmpdir}
 
     return res
 
@@ -185,8 +199,7 @@ class FileCommand(Actor):
         # for outport in self.outports:
         #     files_out.append(self.outports_map[outport.name])
         for port_name, file_name in self.inports_map.items():
-            files_in.append((os.path.abspath(self.inports[port_name].pop()),
-                             file_name))
+            files_in.append((os.path.abspath(self.inports[port_name].pop()), file_name))
         for port_name, file_name in self.outports_map.items():
             files_out.append(file_name)
         args = ()
@@ -234,11 +247,13 @@ def how_to_test():
     input_port_name = 'my_input'
     output_file_name = 'my_output_file.txt'
     output_port_name = 'my_output'
-    open(os.path.join(workdir, input_file_name_tmp), 'w').write('This is my input file :-P')
+    open(
+        os.path.join(workdir, input_file_name_tmp),
+        'w').write('This is my input file :-P')
 
     from wowp.actors.omfit import FileCommand
 
-    command = 'echo "I am TOQ" > {output}; cat {input} >> {output}'.format(
+    command = 'echo "I am TOQ" > {output}; cat {input} >> {output}; sleep 1'.format(
         input=input_file_name,
         output=output_file_name)
 
@@ -248,7 +263,7 @@ def how_to_test():
                       output_files=((output_file_name, output_port_name), ),
                       workdir=workdir,
                       timeout=None,
-                      cleanup=True)
+                      cleanup=False)
 
     kwargs = {input_port_name: os.path.join(workdir, input_file_name_tmp)}
     res = toq(**kwargs)

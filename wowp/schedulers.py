@@ -4,6 +4,7 @@ import threading
 import warnings
 import wowp.components
 import time
+import datetime
 from .logger import logger
 try:
     from ipyparallel import Client, RemoteError
@@ -120,11 +121,15 @@ class _IPySystemJob(object):
         self.actor = actor
         self.args = args
         self.kwargs = kwargs
+        self.started = None
+        self.engine_id = None
+        self.error = None
 
     def ready(self):
         return True
 
     def get(self):
+        self.started = datetime.datetime.now()
         return self.actor.run(*self.args, **self.kwargs)
 
     def display_outputs(self):

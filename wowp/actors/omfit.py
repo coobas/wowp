@@ -143,10 +143,13 @@ class FileCommand(Actor):
         input_files: a list of (file_name, port_name) mappings
         output_files: a list of (file_name, port_name) mappings
         workdir (str): where temporary directories will be created
+        shell_res: add shell_res output port with shell results and text outputs
+        single_out: join outputs into a single dict
         shell(str): the shell path [/bin/bash]
         print_output (bool): print the std out/err [True]
         timeout (float): maximum run time for the executable
         cleanup (bool): cleanup temporary directories
+        raise_error (bool): raise and exception in case of an error in the shell process [True]
     """
 
     def __init__(self,
@@ -155,10 +158,13 @@ class FileCommand(Actor):
                  input_files=(),
                  output_files=(),
                  workdir=None,
+                 shell_res=False,
+                 single_out=False,
                  shell='/bin/bash',
                  print_output=True,
                  timeout=None,
-                 cleanup=False):
+                 cleanup=False,
+                 raise_error=True):
         super(FileCommand, self).__init__(name=name)
 
         # use input and output file names as ports
@@ -176,19 +182,28 @@ class FileCommand(Actor):
                 file_name, port_name = in_file
             self.inports_map[port_name] = file_name
             self.inports.append(port_name)
+        if single_out:
+            self.outports.append('out')
         for out_file in output_files:
             if isinstance(out_file, six.string_types):
                 file_name, port_name = out_file, out_file
             else:
                 file_name, port_name = out_file
             self.outports_map[port_name] = file_name
-            self.outports.append(port_name)
+            if not single_out:
+                self.outports.append(port_name)
+
+        if shell_res and not single_out:
+            self.outports.append('shell_res')
 
         self.command = command
         self.workdir = workdir
+        self.single_out = single_out
         self.shell = shell
         self.timeout = timeout
-        self.cleanup = cleanup
+        self.cleanup = bool(cleanup)
+        self.shell_res = bool(shell_res)
+        self.raise_error = bool(raise_error)
 
     def get_run_args(self):
         # get the input file names
@@ -208,7 +223,10 @@ class FileCommand(Actor):
                   'workdir': self.workdir,
                   'command': self.command,
                   'shell': self.shell,
+                  'single_out': self.single_out,
                   'timeout': self.timeout,
+                  'raise_error': self.raise_error,
+                  'shell_res': self.shell_res,
                   'cleanup': self.cleanup}
 
         return args, kwargs
@@ -229,12 +247,19 @@ class FileCommand(Actor):
         # possibly look at shell_res here (for error etc)
 
         if shell_res['ret'] != 0:
-            raise Exception('error running toq')
+            if kwargs['raise_error']:
+                raise Exception('error running toq:\n{}\n{}'.format(shell_res['stdout'],
+                                                                    shell_res['stderr']))
 
         # puth output file names into output ports
         res = {}
+
         for port_name, file_name in kwargs['outports_map'].items():
             res[port_name] = os.path.join(shell_res['tmpdir'], file_name)
+        if kwargs['shell_res']:
+            res['shell_res'] = shell_res
+        if kwargs['single_out']:
+            res = {'out': res}
         return res
 
 

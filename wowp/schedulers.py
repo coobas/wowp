@@ -1,4 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+
+import inspect
 from collections import deque
 import threading
 import warnings
@@ -6,6 +8,7 @@ import wowp.components
 import time
 import datetime
 from .logger import logger
+
 try:
     from ipyparallel import Client, RemoteError
 except ImportError:
@@ -138,7 +141,7 @@ class _IPySystemJob(object):
 
 class IPyClusterScheduler(_ActorRunner):
     """
-    Scheduler using IPython Cluster.
+    Scheduler using ipyparallel cluster.
 
     Args:
         display_outputs (Optional[bool]): display stdout/err from actors [False]
@@ -146,7 +149,6 @@ class IPyClusterScheduler(_ActorRunner):
         min_engines (Optional[int]): minimum number of engines [1]
         *args: passed to self.init_cluster(*args, **kwargs)
         **kwargs: passed to self.init_cluster(*args, **kwargs)
-
     """
 
     def __init__(self, *args, **kwargs):
@@ -160,7 +162,9 @@ class IPyClusterScheduler(_ActorRunner):
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
-        self.init_cluster(*args, **kwargs)
+        self._ipy_rc = self.init_cluster(self.min_engines, self.timeout, *args, **kwargs)
+        self._ipy_dv = self._ipy_rc[:]
+        self._ipy_lv = self._ipy_rc.load_balanced_view()
 
     def copy(self):
         return self.__class__(*self._init_args, **self._init_kwargs)
@@ -168,7 +172,8 @@ class IPyClusterScheduler(_ActorRunner):
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))
 
-    def init_cluster(self, *args, **kwargs):
+    @staticmethod
+    def init_cluster(min_engines, timeout, *args, **kwargs):
         '''Get a connection (view) to an IPython cluster
 
         Args:
@@ -176,7 +181,7 @@ class IPyClusterScheduler(_ActorRunner):
             **kwargs: passed to ipyparallel.Client(*args, **kwargs)
         '''
 
-        maxtime = time.time() + self.timeout
+        maxtime = time.time() + timeout
 
         while True:
             try:
@@ -187,9 +192,9 @@ class IPyClusterScheduler(_ActorRunner):
                     raise e
                 else:
                     # sleep and try again to get the client
-                    time.sleep(self.timeout * 0.1)
+                    time.sleep(timeout * 0.1)
                     continue
-            if len(cli.ids) >= self.min_engines:
+            if len(cli.ids) >= min_engines:
                 # we have enough clients
                 break
             else:
@@ -200,9 +205,7 @@ class IPyClusterScheduler(_ActorRunner):
             # try ~10 times
             time.sleep(self.timeout * 0.1)
 
-        self._ipy_rc = cli
-        self._ipy_dv = self._ipy_rc[:]
-        self._ipy_lv = self._ipy_rc.load_balanced_view()
+        return cli
 
     def execute(self):
 
@@ -235,16 +238,16 @@ class IPyClusterScheduler(_ActorRunner):
                         job_description['engine'] = job_description['job'].engine_id
                         logger.debug('started {started} actor {actor}({args}, {kwargs})'
                                      ' on engine {engine} at {started}'.format(
-                                         actor=actor.name,
-                                         **job_description))
+                                actor=actor.name,
+                                **job_description))
 
                 if 'completed' not in job_description:
                     # log the started time
                     if job_description['job'].started:
                         job_description['completed'] = job_description['job'].started
                         logger.debug('completed actor {actor} at {completed}'.format(
-                            actor=actor.name,
-                            **job_description))
+                                actor=actor.name,
+                                **job_description))
 
                 # process result
                 # raise RemoteError in case of failure
@@ -252,7 +255,7 @@ class IPyClusterScheduler(_ActorRunner):
                     result = job.get()
                 except RemoteError:
                     logger.error('actor {} failed\n{}'.format(actor.name,
-                                 job_description['job'].error))
+                                                              job_description['job'].error))
                     raise
                 if self.display_outputs:
                     job.display_outputs()
@@ -306,6 +309,87 @@ class IPyClusterScheduler(_ActorRunner):
             res['job'] = _IPySystemJob(actor, *args, **kwargs)
         else:
             res['job'] = self._ipy_lv.apply_async(actor.run, *args, **kwargs)
+
+        logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
+
+        return res
+
+
+class MultiIpyClusterScheduler(IPyClusterScheduler):
+    """Scheduler using multiple ipyparallel clusters.
+
+    Can use more than 1 ipyparallel cluster in order to avoid limitations for the number of engines.
+    Either profiles or profile_dirs must be specified.
+
+    Args:
+        profiles (Optional[iterable]): list of ipyparallel profile names
+        profile_dirs (Optional[iterable]): list of ipyparallel profile directories
+        display_outputs (Optional[bool]): display stdout/err from actors [False]
+        timeout (Optional): timeout in secs for waiting for ipyparallel cluster [60]
+        min_engines (Optional[int]): minimum number of engines [1]
+        client_kwargs: passed to ipyparallel.Client( **kwargs)
+    """
+
+    def __init__(self, profiles=(), profile_dirs=(), display_outputs=False, timeout=60, min_engines=1,
+                 client_kwargs=None):
+        self.process_pool = []
+        # actor: job
+        frame = inspect.currentframe()
+        args, varargs, keywords, values = inspect.getargvalues(frame)
+        self._init_args = args
+        if keywords:
+            self._init_kwargs = {k: values[k] for k in keywords}
+        else:
+            self._init_kwargs = {}
+        self.display_outputs = display_outputs
+        self.timeout = timeout
+        self.min_engines = min_engines
+        # get individual clients
+        self._ipy_rc = []
+        self._current_cli = 0
+        self._ipy_lv = []
+        self._ipy_dv = []
+        # decide whether to use profiles or profile_dirs
+        if profiles:
+            cli_arg = 'profile'
+            cli_args = profiles
+        else:
+            cli_arg = 'profile_dir'
+            cli_args = profile_dirs
+        if not cli_args:
+            raise ValueError('Either profiles or profile_dirs must be specified')
+
+        for value in cli_args:
+            # init ipyparallel clients
+            kwargs = {cli_arg: value}
+            if client_kwargs:
+                kwargs.update(client_kwargs)
+            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **kwargs))
+            self._ipy_dv.append(self._ipy_rc[-1][:])
+            self._ipy_lv.append(self._ipy_rc[-1].load_balanced_view())
+
+        self.running_actors = {}
+        self.execution_queue = deque()
+        self.wait_queue = []
+
+    def _rotate_client(self):
+        current = self._current_cli
+        self._current_cli += 1
+        if self._current_cli == len(self._ipy_rc):
+            self._current_cli = 0
+        return current
+
+    def run_actor(self, actor):
+        # print("Run actor {}".format(actor))
+        actor.scheduler = self
+        args, kwargs = actor.get_run_args()
+        # system actors must be run within this process
+        res = dict(args=args, kwargs=kwargs)
+        lv = self._ipy_lv[self._rotate_client()]
+        if actor.system_actor:
+            res['job'] = _IPySystemJob(actor, *args, **kwargs)
+        else:
+            res['job'] = lv.apply_async(actor.run, *args, **kwargs)
 
         logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
 

@@ -129,7 +129,9 @@ class _IPySystemJob(object):
         self.actor = actor
         self.args = args
         self.kwargs = kwargs
-        self.started = None
+        self.started = datetime.datetime.now()
+        self._res = self.actor.run(*self.args, **self.kwargs)
+        self.completed = datetime.datetime.now()
         self.engine_id = None
         self.error = None
 
@@ -137,8 +139,7 @@ class _IPySystemJob(object):
         return True
 
     def get(self):
-        self.started = datetime.datetime.now()
-        return self.actor.run(*self.args, **self.kwargs)
+        return self._res
 
     def display_outputs(self):
         pass

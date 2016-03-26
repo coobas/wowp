@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from wowp.actors import FuncActor
 from wowp.schedulers import IPyClusterScheduler, FuturesScheduler, LinearizedScheduler
+from wowp.logger import logger
 
 
 def _run_tree_512_test(scheduler):
@@ -14,17 +15,17 @@ def _run_tree_512_test(scheduler):
         if depth == 0:
             return act
         else:
-            child1 = FuncActor(ident, outports=('a', ))
-            child2 = FuncActor(ident, outports=('a', ))
+            child1 = FuncActor(ident, outports=('a',))
+            child2 = FuncActor(ident, outports=('a',))
             act.outports['a'].connect(child1.inports['a'])
             act.outports['a'].connect(child2.inports['a'])
             children = [_split_and_sum(child, depth - 1) for child in (child1, child2)]
-            summer = FuncActor(sum, outports=('a', ))
+            summer = FuncActor(sum, outports=('a',))
             summer.inports['a'].connect(children[0].outports['a'])
             summer.inports['b'].connect(children[1].outports['a'])
             return summer
 
-    first = FuncActor(ident, outports=('a', ))
+    first = FuncActor(ident, outports=('a',))
 
     power = 8
     last = _split_and_sum(first, power)
@@ -55,9 +56,9 @@ def _run_linearity_test(scheduler, size=100, ntimes=1):
 
     original_sequence = list(range(max_))
 
-    orig_actor = FuncActor(orig, outports=('x', ))
+    orig_actor = FuncActor(orig, outports=('x',))
     orig_actor.scheduler = scheduler
-    new_actor = FuncActor(app_fn, outports=('x', ))
+    new_actor = FuncActor(app_fn, outports=('x',))
     orig_actor.outports["x"].connect(new_actor.inports["x"])
 
     for t in range(ntimes):
@@ -80,11 +81,13 @@ if __name__ == '__main__':
         _run_tree_512_test,
         lambda scheduler: _run_linearity_test(scheduler, size=100, ntimes=5),
     )
+    logger.level = 20
     for case in (tests):
         print('testing {}'.format(case))
         for scheduler in (LinearizedScheduler(),
-                IPyClusterScheduler(),
-                          FuturesScheduler('distributed', executor_kwargs=dict(uris='192.168.111.23:8786')), ):
-                          # FuturesScheduler('multiprocessing'), ):
+                          IPyClusterScheduler(),
+                          FuturesScheduler('distributed', executor_kwargs=dict(uris='192.168.111.23:8786')),
+                          FuturesScheduler('ipyparallel', timeout=1),):
+            # FuturesScheduler('multiprocessing'), ):
             print('using {}'.format(type(scheduler)))
             case(scheduler)

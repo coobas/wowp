@@ -84,6 +84,7 @@ class _ActorRunner(object):
         # by default, this method does nothing
         pass
 
+
 class NaiveScheduler(_ActorRunner):
     """Scheduler that directly calls connected actors.
 
@@ -130,6 +131,7 @@ class DistributedExecutor(object):
         min_engines (int): minimum number of engines
         timeout(float): time to wait for engines
     """
+
     def __init__(self, uris, min_engines=1, timeout=60):
         from distributed import Executor
         if isinstance(uris, six.string_types):
@@ -155,6 +157,7 @@ class DistributedExecutor(object):
 class MultiprocessingExecutor(object):
     """Executes jobs in local subprocesses using concurrent.futures
     """
+
     def __init__(self, processes):
         from concurrent.futures import ProcessPoolExecutor
         self._pool = ProcessPoolExecutor(max_workers=processes)
@@ -169,6 +172,7 @@ class MultiprocessingExecutor(object):
 class LocalExecutor(object):
     """Executes jobs in the current process
     """
+
     def __init__(self):
         super(LocalExecutor, self).__init__()
 
@@ -176,9 +180,119 @@ class LocalExecutor(object):
         job = LocalFutureJob(func, *args, **kwargs)
         return job
 
+
+class IpyparallelExecutor(object):
+    """Executes jobs using ipyparallel
+
+    Args:
+        profiles (Optional[iterable]): list of ipyparallel profile names
+        profile_dirs (Optional[iterable]): list of ipyparallel profile directories
+        display_outputs (Optional[bool]): display stdout/err from actors [False]
+        timeout (Optional): timeout in secs for waiting for ipyparallel cluster [60]
+        min_engines (Optional[int]): minimum number of engines [1]
+        client_kwargs: passed to ipyparallel.Client( **kwargs)
+    """
+
+    def __init__(self, profiles=(), profile_dirs=(), display_outputs=False, timeout=60, min_engines=1,
+                 client_kwargs=None):
+
+        self.process_pool = []
+        # actor: job
+        frame = inspect.currentframe()
+        args, varargs, keywords, values = inspect.getargvalues(frame)
+        self._init_args = args
+        if keywords:
+            self._init_kwargs = {k: values[k] for k in keywords}
+        else:
+            self._init_kwargs = {}
+        self.display_outputs = display_outputs
+        # get individual clients
+        self._ipy_rc = []
+        self._current_cli = 0
+        self._ipy_lv = []
+        self._ipy_dv = []
+        # decide whether to use profiles or profile_dirs
+        if profiles:
+            cli_arg = 'profile'
+            cli_args = profiles
+        else:
+            cli_arg = 'profile_dir'
+            cli_args = profile_dirs
+        if not cli_args:
+            # raise ValueError('Either profiles or profile_dirs must be specified')
+            cli_arg = 'profile'
+            cli_args = ('default',)
+        if isinstance(cli_args, six.string_types):
+            cli_args = (cli_args,)
+
+        for value in cli_args:
+            # init ipyparallel clients
+            kwargs = {cli_arg: value}
+            if client_kwargs:
+                kwargs.update(client_kwargs)
+            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **kwargs))
+            self._ipy_dv.append(self._ipy_rc[-1][:])
+            self._ipy_lv.append(self._ipy_rc[-1].load_balanced_view())
+
+        self.running_actors = {}
+        self.execution_queue = deque()
+        self.wait_queue = []
+
+    @staticmethod
+    def init_cluster(min_engines, timeout, *args, **kwargs):
+        '''Get a connection (view) to an IPython cluster
+
+        Args:
+            *args: passed to ipyparallel.Client(*args, **kwargs)
+            **kwargs: passed to ipyparallel.Client(*args, **kwargs)
+        '''
+
+        maxtime = time.time() + timeout
+
+        while True:
+            try:
+                cli = Client(*args, **kwargs)
+            except Exception as e:
+                if time.time() > maxtime:
+                    # raise the original exception from ipyparallel
+                    raise e
+                else:
+                    # sleep and try again to get the client
+                    time.sleep(timeout * 0.1)
+                    continue
+            if len(cli.ids) >= min_engines:
+                # we have enough clients
+                break
+            else:
+                # free the client
+                cli.close()
+            if time.time() > maxtime:
+                raise Exception('Not enough ipyparallel clients')
+            # try ~10 times
+            time.sleep(timeout * 0.1)
+
+        return cli
+
+    def _rotate_client(self):
+        # TODO pick the first (most) empty one
+        current = self._current_cli
+        self._current_cli = (self._current_cli + 1) % len(self._ipy_rc)
+        return current
+
+    def submit(self, func, *args, **kwargs):
+        """Submit a function: func(*args, **kwargs) and return a FutureJob.
+        """
+
+        # print("Run actor {}".format(actor))
+        lv = self._ipy_lv[self._rotate_client()]
+        job = lv.apply_async(func, *args, **kwargs)
+        return FutureIpyJob(job)
+
+
 class FutureJob(object):
     """An asynchronous job with Future-like API
     """
+
     def __init__(self, future):
         self._future = future
 
@@ -193,6 +307,7 @@ class FutureJob(object):
 class LocalFutureJob(object):
     """Local (system) job with FutureJob API
     """
+
     def __init__(self, actor, *args, **kwargs):
         self.started = datetime.datetime.now()
         self._result = self.actor.run(*args, **kwargs)
@@ -207,12 +322,21 @@ class LocalFutureJob(object):
         pass
 
 
-class FutureIPyJob(object):
+class FutureIpyJob(object):
     """Wraps asynchronous results of different kinds into a future-like object
     """
 
     def __init__(self, job):
         self._job = job
+
+    def done(self):
+        return self._job.ready()
+
+    def result(self, timeout=None):
+        return self._job.get()
+
+    def display_outputs(self):
+        return self._job.display_outputs()
 
 
 class _IPySystemJob(object):
@@ -313,11 +437,20 @@ class IPyClusterScheduler(_ActorRunner):
         self.reset()
 
         while self.execution_queue or self.running_actors or self.wait_queue:
+            self.nothing = True
+
             self._try_empty_execution_queue()
             self._try_empty_wait_queue()
             self._try_empty_ready_jobs()
-            # TODO shall we sleep here?
-            # could also use ipyparallel callbacks
+
+            # TODO fix against spamming engines - PROBABLY NOT THE BEST WAY!
+            if self.nothing:
+                # increase sleep time if nothing is happening
+                self.last_sleep = min(1, max(0.001, self.last_sleep * 2))
+                logger.debug('scheduler sleeps for {} ms'.format(self.last_sleep * 1e3))
+                time.sleep(self.last_sleep)
+            else:
+                self.last_sleep = 0
 
     def _try_empty_ready_jobs(self):
         pending = {}  # temporary container
@@ -326,15 +459,16 @@ class IPyClusterScheduler(_ActorRunner):
             job = job_description['job']
 
             if 'started' not in job_description and job_description['job'].started:
-            # log the started time
+                # log the started time
                 job_description['started'] = job_description['job'].started
                 job_description['engine'] = job_description['job'].engine_id
                 logger.debug("started {started} actor {actor}({args}, {kwargs})"
                              " on engine {engine}".format(actor=actor.name,
                                                           **job_description))
             if job.ready():
+                self.nothing = False
                 if 'started' not in job_description and job_description['job'].started:
-                # log the started time
+                    # log the started time
                     job_description['started'] = job_description['job'].started
                     job_description['engine'] = job_description['job'].engine_id
                     logger.debug("started {started} actor {actor}({args}, {kwargs})"
@@ -373,8 +507,6 @@ class IPyClusterScheduler(_ActorRunner):
 
             else:
                 pending[actor] = job_description
-        # TODO temporary fix against spanning ipyparallel - NOT A GOOD WAY!
-        time.sleep(0.1)
         self.running_actors = pending
 
     def _try_empty_wait_queue(self):
@@ -382,6 +514,7 @@ class IPyClusterScheduler(_ActorRunner):
         for actor in self.wait_queue:
             # run actors only if not already running
             if actor not in self.running_actors:
+                self.nothing = False
                 # TODO can we iterate and remove at the same time?
                 self.running_actors[actor] = self.run_actor(actor)
             else:
@@ -393,6 +526,7 @@ class IPyClusterScheduler(_ActorRunner):
             in_port, value = self.execution_queue.pop()
             should_run = in_port.put(value)
             if should_run:
+                self.nothing = False
                 # waiting to be run
                 self.wait_queue.append(in_port.owner)
                 # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))
@@ -498,8 +632,7 @@ class FuturesScheduler(_ActorRunner):
     """Scheduler using PEP 3148 futures
 
     Args:
-        profiles (Optional[iterable]): list of ipyparallel profile names
-        profile_dirs (Optional[iterable]): list of ipyparallel profile directories
+        executor (str): executor type: multiprocessing, distributed, ipyparallel
         display_outputs (Optional[bool]): display stdout/err from actors [False]
         timeout (Optional): timeout in secs for waiting for ipyparallel cluster [60]
         min_engines (Optional[int]): minimum number of engines [1]
@@ -527,6 +660,10 @@ class FuturesScheduler(_ActorRunner):
             self.executor = MultiprocessingExecutor(processes=min_engines)
         elif executor == 'distributed':
             self.executor = DistributedExecutor(uris=executor_kwargs['uris'], min_engines=min_engines, timeout=timeout)
+        elif executor == 'ipyparallel':
+            kwargs = dict(min_engines=min_engines, timeout=timeout, display_outputs=display_outputs)
+            kwargs.update(executor_kwargs)
+            self.executor = IpyparallelExecutor(**kwargs)
         # elif executor == 'scoop':
         #     self.executor = ScoopExecutor()
         self.system_executor = LocalExecutor()
@@ -538,6 +675,7 @@ class FuturesScheduler(_ActorRunner):
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
+        self.last_sleep = 0
 
     def run_actor(self, actor):
         # print("Run actor {}".format(actor))
@@ -562,11 +700,22 @@ class FuturesScheduler(_ActorRunner):
 
     def execute(self):
         while self.execution_queue or self.running_actors or self.wait_queue:
+            self.nothing = True
+
             self._try_empty_execution_queue()
             self._try_empty_wait_queue()
             self._try_empty_ready_jobs()
-            # TODO shall we sleep here?
-            # could also use callbacks
+
+            # TODO fix against spamming engines - PROBABLY NOT THE BEST WAY!
+            if self.nothing:
+                # increase sleep time if nothing is happening
+                self.last_sleep = min(1, max(0.001, self.last_sleep * 2))
+                logger.debug('scheduler sleeps for {} ms'.format(self.last_sleep * 1e3))
+                time.sleep(self.last_sleep)
+            else:
+                self.last_sleep = 0
+
+                # TODO could we use callbacks?
 
     def _try_empty_ready_jobs(self):
         pending = {}  # temporary container
@@ -575,6 +724,7 @@ class FuturesScheduler(_ActorRunner):
             job = job_description['job']
 
             if job.done():
+                self.nothing = False
                 # process result
                 # raise RemoteError in case of failure
                 try:
@@ -602,8 +752,6 @@ class FuturesScheduler(_ActorRunner):
 
             else:
                 pending[actor] = job_description
-        # TODO temporary fix against spanning ipyparallel - NOT A GOOD WAY!
-        time.sleep(0.1)
         self.running_actors = pending
 
     def _try_empty_wait_queue(self):
@@ -611,6 +759,7 @@ class FuturesScheduler(_ActorRunner):
         for actor in self.wait_queue:
             # run actors only if not already running
             if actor not in self.running_actors:
+                self.nothing = False
                 # TODO can we iterate and remove at the same time?
                 self.running_actors[actor] = self.run_actor(actor)
             else:
@@ -622,6 +771,7 @@ class FuturesScheduler(_ActorRunner):
             in_port, value = self.execution_queue.pop()
             should_run = in_port.put(value)
             if should_run:
+                self.nothing = False
                 # waiting to be run
                 self.wait_queue.append(in_port.owner)
                 # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))

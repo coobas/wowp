@@ -76,6 +76,11 @@ class _ActorRunner(object):
         # TODO can this be run inside self.execute itsef?
         scheduler.execute()
 
+    def reset(self):
+        """Reset the scheduler
+        """
+        # by default, this method does nothing
+        pass
 
 class NaiveScheduler(_ActorRunner):
     """Scheduler that directly calls connected actors.
@@ -208,6 +213,8 @@ class IPyClusterScheduler(_ActorRunner):
         return cli
 
     def execute(self):
+
+        self.reset()
 
         while self.execution_queue or self.running_actors or self.wait_queue:
             self._try_empty_execution_queue()

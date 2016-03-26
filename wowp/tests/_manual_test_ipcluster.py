@@ -86,7 +86,7 @@ if __name__ == '__main__':
         print('testing {}'.format(case))
         for scheduler in (LinearizedScheduler(),
                           IPyClusterScheduler(),
-                          FuturesScheduler('distributed', executor_kwargs=dict(uris='192.168.111.23:8786')),
+                          FuturesScheduler('distributed', executor_kwargs=dict(uris='127.0.01:8786')),
                           FuturesScheduler('ipyparallel', timeout=1),):
             # FuturesScheduler('multiprocessing'), ):
             print('using {}'.format(type(scheduler)))

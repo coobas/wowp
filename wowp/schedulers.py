@@ -230,32 +230,27 @@ class IPyClusterScheduler(_ActorRunner):
 
             job = job_description['job']
 
-            if 'started' not in job_description:
+            if 'started' not in job_description and job_description['job'].started:
+            # log the started time
+                job_description['started'] = job_description['job'].started
+                job_description['engine'] = job_description['job'].engine_id
+                logger.debug("started {started} actor {actor}({args}, {kwargs})"
+                             " on engine {engine}".format(actor=actor.name,
+                                                          **job_description))
+            if job.ready():
+                if 'started' not in job_description and job_description['job'].started:
                 # log the started time
-                if job_description['job'].started:
                     job_description['started'] = job_description['job'].started
                     job_description['engine'] = job_description['job'].engine_id
-                    logger.debug('started {started} actor {actor}({args}, {kwargs})'
-                                 ' on engine {engine}'.format(actor=actor.name,
-                                                              **job_description))
-            if job.ready():
-                if 'started' not in job_description:
-                    # log the started time
-                    if job_description['job'].started:
-                        job_description['started'] = job_description['job'].started
-                        job_description['engine'] = job_description['job'].engine_id
-                        logger.debug('started {started} actor {actor}({args}, {kwargs})'
-                                     ' on engine {engine} at {started}'.format(
-                                actor=actor.name,
-                                **job_description))
+                    logger.debug("started {started} actor {actor}({args}, {kwargs})"
+                                 " on engine {engine} at {started}".format(
+                        actor=actor.name,
+                        **job_description))
 
-                if 'completed' not in job_description:
-                    # log the started time
-                    if job_description['job'].started:
-                        job_description['completed'] = job_description['job'].started
-                        logger.debug('completed actor {actor} at {completed}'.format(
-                                actor=actor.name,
-                                **job_description))
+                job_description['completed'] = job_description['job'].completed
+                logger.debug('completed actor {actor} at {completed}'.format(
+                    actor=actor.name,
+                    **job_description))
 
                 # process result
                 # raise RemoteError in case of failure

@@ -200,7 +200,7 @@ class IpyparallelExecutor(object):
         # actor: job
         frame = inspect.currentframe()
         args, varargs, keywords, values = inspect.getargvalues(frame)
-        self._init_args = args
+        self._init_args = [values[k] for k in args[1:]]
         if keywords:
             self._init_kwargs = {k: values[k] for k in keywords}
         else:
@@ -568,7 +568,7 @@ class MultiIpyClusterScheduler(IPyClusterScheduler):
         # actor: job
         frame = inspect.currentframe()
         args, varargs, keywords, values = inspect.getargvalues(frame)
-        self._init_args = args
+        self._init_args = [values[k] for k in args[1:]]
         if keywords:
             self._init_kwargs = {k: values[k] for k in keywords}
         else:
@@ -648,7 +648,7 @@ class FuturesScheduler(_ActorRunner):
         # for .copy()
         frame = inspect.currentframe()
         args, varargs, keywords, values = inspect.getargvalues(frame)
-        self._init_args = args
+        self._init_args = [values[k] for k in args[1:]]
         if keywords:
             self._init_kwargs = {k: values[k] for k in keywords}
         else:

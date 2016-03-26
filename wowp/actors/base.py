@@ -70,7 +70,7 @@ class FuncActor(Actor):
 
     def get_run_args(self):
         args = tuple(port.pop() for port in self.inports)
-        kwargs = {'func': self.func,
+        kwargs = {'runfunc': self.func,
                   'func_args': self._func_args,
                   'func_kwargs': self._func_kwargs,
                   'outports': tuple(port.name for port in self.outports)}
@@ -82,7 +82,7 @@ class FuncActor(Actor):
     @staticmethod
     def run(*args, **kwargs):
         args = kwargs['func_args'] + args
-        func_res = kwargs['func'](*args, **kwargs['func_kwargs'])
+        func_res = kwargs['runfunc'](*args, **kwargs['func_kwargs'])
         outports = kwargs['outports']
 
         if len(outports) == 1:

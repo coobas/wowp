@@ -209,7 +209,7 @@ class IPyClusterScheduler(_ActorRunner):
             if time.time() > maxtime:
                 raise Exception('Not enough ipyparallel clients')
             # try ~10 times
-            time.sleep(self.timeout * 0.1)
+            time.sleep(timeout * 0.1)
 
         return cli
 

@@ -308,9 +308,9 @@ class LocalFutureJob(object):
     """Local (system) job with FutureJob API
     """
 
-    def __init__(self, actor, *args, **kwargs):
+    def __init__(self, func, *args, **kwargs):
         self.started = datetime.datetime.now()
-        self._result = self.actor.run(*args, **kwargs)
+        self._result = func(*args, **kwargs)
 
     def done(self):
         return True

@@ -1,7 +1,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+
+from wowp.util import ConstructorWrapper
 from wowp.actors import FuncActor
 from wowp.actors.mapreduce import Map  # , Reduce
 from wowp.schedulers import LinearizedScheduler
+from nose.tools import assert_sequence_equal
 import six
 if six.PY2:
     from itertools import izip_longest as zip_longest
@@ -14,7 +17,7 @@ from string import ascii_uppercase
 def test_map_run():
     func = lambda x: x * 2
     inp = range(5)
-    map_act = Map(FuncActor, args=(func, ), scheduler=LinearizedScheduler())
+    map_act = Map(FuncActor, args=(func, ), kwargs={'inports': ('inp', )}, scheduler=LinearizedScheduler())
     map_act.inports.inp.put(inp)
     result = map_act.run()
     assert all(a == b for a, b in zip_longest(result['out'], map(func, inp)))
@@ -61,6 +64,20 @@ def test_map_shell():
 #     test_str = 'abcdEFG'
 #     res = map_actor(test_str)
 #     assert res['out'] == test_str.upper()
+
+
+def swap(a, b):
+    return b, a
+
+def test_map_multiport():
+    actor_class = ConstructorWrapper(FuncActor, swap, inports=('a', 'b'), outports=('a', 'b'))
+    amap = Map(actor_class, scheduler=LinearizedScheduler())
+
+    inputs = dict(a=[1, 2], b=[10, 20])
+    res = amap(**inputs)
+    print(res)
+    assert_sequence_equal(res['a'], inputs['b'])
+
 
 if __name__ == '__main__':
     import nose

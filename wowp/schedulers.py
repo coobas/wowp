@@ -14,7 +14,8 @@ from .logger import logger
 try:
     from ipyparallel import Client, RemoteError
 except ImportError:
-    warnings.warn('ipyparallel not installed: IPyClusterScheduler cannot be used')
+    warnings.warn(
+        'ipyparallel not installed: IPyClusterScheduler cannot be used')
 
 
 class _ActorRunner(object):
@@ -135,7 +136,7 @@ class DistributedExecutor(object):
     def __init__(self, uris, min_engines=1, timeout=60):
         from distributed import Executor
         if isinstance(uris, six.string_types):
-            uris = (uris,)
+            uris = (uris, )
         self._clients = [Executor(addr) for addr in uris]
         self._current_cli = 0
         # TODO assure
@@ -193,7 +194,12 @@ class IpyparallelExecutor(object):
         client_kwargs: passed to ipyparallel.Client( **kwargs)
     """
 
-    def __init__(self, profiles=(), profile_dirs=(), display_outputs=False, timeout=60, min_engines=1,
+    def __init__(self,
+                 profiles=(),
+                 profile_dirs=(),
+                 display_outputs=False,
+                 timeout=60,
+                 min_engines=1,
                  client_kwargs=None):
 
         self.process_pool = []
@@ -221,16 +227,17 @@ class IpyparallelExecutor(object):
         if not cli_args:
             # raise ValueError('Either profiles or profile_dirs must be specified')
             cli_arg = 'profile'
-            cli_args = ('default',)
+            cli_args = ('default', )
         if isinstance(cli_args, six.string_types):
-            cli_args = (cli_args,)
+            cli_args = (cli_args, )
 
         for value in cli_args:
             # init ipyparallel clients
             kwargs = {cli_arg: value}
             if client_kwargs:
                 kwargs.update(client_kwargs)
-            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **kwargs))
+            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **
+                                                  kwargs))
             self._ipy_dv.append(self._ipy_rc[-1][:])
             self._ipy_lv.append(self._ipy_rc[-1].load_balanced_view())
 
@@ -258,6 +265,8 @@ class IpyparallelExecutor(object):
                     raise e
                 else:
                     # sleep and try again to get the client
+                    print("Waiting for ipyparallel cluster Client(*{}, **{})".format(args, kwargs))
+                    print(e)
                     time.sleep(timeout * 0.1)
                     continue
             if len(cli.ids) >= min_engines:
@@ -269,6 +278,7 @@ class IpyparallelExecutor(object):
             if time.time() > maxtime:
                 raise Exception('Not enough ipyparallel clients')
             # try ~10 times
+            print("Found {}/{} clients, need more ...".format(len(cli.ids), min_engines))
             time.sleep(timeout * 0.1)
 
         return cli
@@ -387,7 +397,8 @@ class IPyClusterScheduler(_ActorRunner):
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
-        self._ipy_rc = self.init_cluster(self.min_engines, self.timeout, *args, **kwargs)
+        self._ipy_rc = self.init_cluster(self.min_engines, self.timeout, *args,
+                                         **kwargs)
         self._ipy_dv = self._ipy_rc[:]
         self._ipy_lv = self._ipy_rc.load_balanced_view()
 
@@ -447,7 +458,8 @@ class IPyClusterScheduler(_ActorRunner):
             if self.nothing:
                 # increase sleep time if nothing is happening
                 self.last_sleep = min(1, max(0.001, self.last_sleep * 2))
-                logger.debug('scheduler sleeps for {} ms'.format(self.last_sleep * 1e3))
+                logger.debug('scheduler sleeps for {} ms'.format(
+                    self.last_sleep * 1e3))
                 time.sleep(self.last_sleep)
             else:
                 self.last_sleep = 0
@@ -458,23 +470,28 @@ class IPyClusterScheduler(_ActorRunner):
 
             job = job_description['job']
 
-            if 'started' not in job_description and job_description['job'].started:
+            if 'started' not in job_description and job_description[
+                    'job'].started:
                 # log the started time
                 job_description['started'] = job_description['job'].started
                 job_description['engine'] = job_description['job'].engine_id
-                logger.debug("started {started} actor {actor}({args}, {kwargs})"
-                             " on engine {engine}".format(actor=actor.name,
-                                                          **job_description))
+                logger.debug(
+                    "started {started} actor {actor}({args}, {kwargs})"
+                    " on engine {engine}".format(actor=actor.name,
+                                                 **job_description))
             if job.ready():
                 self.nothing = False
-                if 'started' not in job_description and job_description['job'].started:
+                if 'started' not in job_description and job_description[
+                        'job'].started:
                     # log the started time
                     job_description['started'] = job_description['job'].started
-                    job_description['engine'] = job_description['job'].engine_id
-                    logger.debug("started {started} actor {actor}({args}, {kwargs})"
-                                 " on engine {engine} at {started}".format(
-                        actor=actor.name,
-                        **job_description))
+                    job_description['engine'] = job_description[
+                        'job'].engine_id
+                    logger.debug(
+                        "started {started} actor {actor}({args}, {kwargs})"
+                        " on engine {engine} at {started}".format(
+                            actor=actor.name,
+                            **job_description))
 
                 job_description['completed'] = job_description['job'].completed
                 logger.debug('completed actor {actor} at {completed}'.format(
@@ -486,8 +503,8 @@ class IPyClusterScheduler(_ActorRunner):
                 try:
                     result = job.get()
                 except RemoteError:
-                    logger.error('actor {} failed\n{}'.format(actor.name,
-                                                              job_description['job'].error))
+                    logger.error('actor {} failed\n{}'.format(
+                        actor.name, job_description['job'].error))
                     raise
                 if self.display_outputs:
                     job.display_outputs()
@@ -495,15 +512,17 @@ class IPyClusterScheduler(_ActorRunner):
                     # empty results don't need any processing
                     out_names = actor.outports.keys()
                     if not hasattr(result, 'items'):
-                        raise ValueError('The execute method must return '
-                                         'a dict-like object with items method')
+                        raise ValueError(
+                            'The execute method must return '
+                            'a dict-like object with items method')
                     for name, value in result.items():
                         if name in out_names:
                             outport = actor.outports[name]
                             outport.put(value)
                             self.on_outport_put_value(outport)
                         else:
-                            raise ValueError("{} not in output ports".format(name))
+                            raise ValueError("{} not in output ports".format(
+                                name))
 
             else:
                 pending[actor] = job_description
@@ -542,7 +561,8 @@ class IPyClusterScheduler(_ActorRunner):
         else:
             res['job'] = self._ipy_lv.apply_async(actor.run, *args, **kwargs)
 
-        logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
+        logger.debug('submitted actor {}({}, {})'.format(actor.name, args,
+                                                         kwargs))
 
         return res
 
@@ -562,7 +582,12 @@ class MultiIpyClusterScheduler(IPyClusterScheduler):
         client_kwargs: passed to ipyparallel.Client( **kwargs)
     """
 
-    def __init__(self, profiles=(), profile_dirs=(), display_outputs=False, timeout=60, min_engines=1,
+    def __init__(self,
+                 profiles=(),
+                 profile_dirs=(),
+                 display_outputs=False,
+                 timeout=60,
+                 min_engines=1,
                  client_kwargs=None):
         self.process_pool = []
         # actor: job
@@ -589,14 +614,16 @@ class MultiIpyClusterScheduler(IPyClusterScheduler):
             cli_arg = 'profile_dir'
             cli_args = profile_dirs
         if not cli_args:
-            raise ValueError('Either profiles or profile_dirs must be specified')
+            raise ValueError(
+                'Either profiles or profile_dirs must be specified')
 
         for value in cli_args:
             # init ipyparallel clients
             kwargs = {cli_arg: value}
             if client_kwargs:
                 kwargs.update(client_kwargs)
-            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **kwargs))
+            self._ipy_rc.append(self.init_cluster(min_engines, timeout, **
+                                                  kwargs))
             self._ipy_dv.append(self._ipy_rc[-1][:])
             self._ipy_lv.append(self._ipy_rc[-1].load_balanced_view())
 
@@ -623,7 +650,8 @@ class MultiIpyClusterScheduler(IPyClusterScheduler):
         else:
             res['job'] = lv.apply_async(actor.run, *args, **kwargs)
 
-        logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
+        logger.debug('submitted actor {}({}, {})'.format(actor.name, args,
+                                                         kwargs))
 
         return res
 
@@ -639,7 +667,11 @@ class FuturesScheduler(_ActorRunner):
         client_kwargs: passed to ipyparallel.Client( **kwargs)
     """
 
-    def __init__(self, executor, display_outputs=False, min_engines=1, timeout=60,
+    def __init__(self,
+                 executor,
+                 display_outputs=False,
+                 min_engines=1,
+                 timeout=60,
                  executor_kwargs=None):
 
         if executor_kwargs is None:
@@ -659,9 +691,13 @@ class FuturesScheduler(_ActorRunner):
         if executor == 'multiprocessing':
             self.executor = MultiprocessingExecutor(processes=min_engines)
         elif executor == 'distributed':
-            self.executor = DistributedExecutor(uris=executor_kwargs['uris'], min_engines=min_engines, timeout=timeout)
+            self.executor = DistributedExecutor(uris=executor_kwargs['uris'],
+                                                min_engines=min_engines,
+                                                timeout=timeout)
         elif executor == 'ipyparallel':
-            kwargs = dict(min_engines=min_engines, timeout=timeout, display_outputs=display_outputs)
+            kwargs = dict(min_engines=min_engines,
+                          timeout=timeout,
+                          display_outputs=display_outputs)
             kwargs.update(executor_kwargs)
             self.executor = IpyparallelExecutor(**kwargs)
         # elif executor == 'scoop':
@@ -684,11 +720,13 @@ class FuturesScheduler(_ActorRunner):
         # system actors must be run within this process
         res = dict(args=args, kwargs=kwargs)
         if actor.system_actor:
-            res['job'] = self.system_executor.submit(actor.run, *args, **kwargs)
+            res['job'] = self.system_executor.submit(actor.run, *args, **
+                                                     kwargs)
         else:
             res['job'] = self.executor.submit(actor.run, *args, **kwargs)
 
-        logger.debug('submitted actor {}({}, {})'.format(actor.name, args, kwargs))
+        logger.debug('submitted actor {}({}, {})'.format(actor.name, args,
+                                                         kwargs))
 
         return res
 
@@ -710,7 +748,8 @@ class FuturesScheduler(_ActorRunner):
             if self.nothing:
                 # increase sleep time if nothing is happening
                 self.last_sleep = min(1, max(0.001, self.last_sleep * 2))
-                logger.debug('scheduler sleeps for {} ms'.format(self.last_sleep * 1e3))
+                logger.debug('scheduler sleeps for {} ms'.format(
+                    self.last_sleep * 1e3))
                 time.sleep(self.last_sleep)
             else:
                 self.last_sleep = 0
@@ -730,8 +769,8 @@ class FuturesScheduler(_ActorRunner):
                 try:
                     result = job.result()
                 except Exception:
-                    logger.error('actor {} failed\n{}'.format(actor.name,
-                                                              traceback.format_exc()))
+                    logger.error('actor {} failed\n{}'.format(
+                        actor.name, traceback.format_exc()))
                     self.reset()
                     raise
                 if self.display_outputs:
@@ -740,15 +779,17 @@ class FuturesScheduler(_ActorRunner):
                     # empty results don't need any processing
                     out_names = actor.outports.keys()
                     if not hasattr(result, 'items'):
-                        raise ValueError('The execute method must return '
-                                         'a dict-like object with items method')
+                        raise ValueError(
+                            'The execute method must return '
+                            'a dict-like object with items method')
                     for name, value in result.items():
                         if name in out_names:
                             outport = actor.outports[name]
                             outport.put(value)
                             self.on_outport_put_value(outport)
                         else:
-                            raise ValueError("{} not in output ports".format(name))
+                            raise ValueError("{} not in output ports".format(
+                                name))
 
             else:
                 pending[actor] = job_description

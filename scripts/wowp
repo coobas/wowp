@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import click
+
+
+@click.command(help="Execute WOW:-P workflow")
+@click.option(
+    '--scheduler',
+    help="Scheduler")
+@click.argument('workflow', nargs=1, type=click.Path(exists=True))
+@click.pass_context
+def main(ctx, scheduler, workflow):
+    print("Hello WOW:-P")
+
+
+def start():
+    main()
+
+
+if __name__ == '__main__':
+    start()

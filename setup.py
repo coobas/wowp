@@ -6,6 +6,7 @@ setup(
         name='wowp',
         version=get_version(),
         packages=find_packages(),
+        scripts=['scripts/wowp', 'scripts/wowp_on_slurm'],
         license='MIT',
         description='Data-flow-actors-based workflow framework',
         long_description=open('README.txt').read(),
@@ -17,8 +18,9 @@ setup(
                           'networkx',
                           'nose',
                           'six',
+                          'click',
                           ],
-        extras_require = {'parallel': ['ipyparallel']},
+        extras_require={'parallel': ['ipyparallel']},
         entry_points={
             # 'console_scripts' : [
             #    'wowp = wowp:function_that_does_it_all'

@@ -5,7 +5,6 @@ from __future__ import print_function, division, absolute_import
 import os
 import sys
 import click
-import multiprocessing
 import datetime
 import six
 import shlex
@@ -15,6 +14,7 @@ import time
 import contextlib
 import StringIO
 import traceback
+import logging
 
 if os.name == 'posix' and sys.version_info[0] < 3:
     import subprocess32 as subprocess
@@ -33,11 +33,12 @@ def stdoutIO(stream='stdout'):
     setattr(sys, stream, old)
 
 
-def instat_log_file(filename, msg, mode="w"):
+def instant_log_file(filename, msg, mode="w"):
     now = str(datetime.datetime.now())
     if DUMMY:
         print("{}\n{}\n{}".format(filename, now, msg))
     else:
+        logging.debug(msg)
         with open(filename, mode) as f_out:
             f_out.write(now + '\n' + msg)
 
@@ -47,6 +48,11 @@ local_id = int(os.getenv('SLURM_LOCALID', 0))
 cpus_on_node = int(os.getenv('SLURM_CPUS_ON_NODE', 1))
 nnodes = int(os.getenv('SLURM_JOB_NUM_NODES', 1))
 jobid = os.getenv('SLURM_JOBID', 0)
+
+logging.basicConfig(filename="wos_{}_{:02d}_{:02d}.log".format(jobid, node_id, local_id),
+                    filemode='w',
+                    format='%(asctime)s %(message)s',
+                    level=logging.DEBUG)
 
 msg = """{date}
 node: {node}
@@ -59,17 +65,15 @@ local_id: {local_id}
            node_id=node_id,
            local_id=local_id)
 print(msg)
-f_log = open("log_{:02d}_{:02d}".format(int(node_id), int(local_id)), "w")
-f_log.write(msg)
-f_log.close()
+logging.info(msg)
 
 
 def Popen(*args, **kwargs):
-    # if kwargs['shell']:
-    #     # turn shell commands into non-shell in order to enable terminate
-    #     cmd = shlex.split(args[0])
-    #     args = (cmd, ) + args[1:]
-    #     kwargs['shell'] = False
+    if kwargs['shell']:
+        # turn shell commands into non-shell in order to enable terminate
+        cmd = shlex.split(args[0])
+        args = (cmd, ) + args[1:]
+        kwargs['shell'] = False
     if DUMMY:
         print("DUMMY Popen(*{}, **{})".format(args, kwargs))
     else:
@@ -88,20 +92,53 @@ def check_ipcontroller(profile_dir, timeout=600, interval=1, silent=False):
     while True:
         time.sleep(interval)
         try:
+            logging.debug('Trying Client(profile_dir={}'.format(profile_dir))
             if not silent:
                 print('Trying Client(profile_dir={}'.format(profile_dir))
             Client(profile_dir=profile_dir)
         except Exception as e:
             if not silent:
                 print(e)
+                logging.debug(str(e))
+            logging.info('sleep({})'.format(interval))
             time.sleep(interval)
         else:
             break
         if time.time() > maxtime:
+            logging.error('time out in checl_ipcontroller')
             raise Exception('Timeout')
 
 
-def ipcontroller(profile_dir=None, bin_path=None, monitor_period=None):
+def check_dscheduler(dscheduler, timeout=600, interval=1):
+
+    from distributed import Executor
+
+    if DUMMY:
+        print('DUMMY check_ipcontroller')
+        time.sleep(1)
+        return None
+
+    maxtime = time.time() + timeout
+    while True:
+        try:
+            logging.debug('Trying Executor({})'.format(dscheduler))
+            Executor(dscheduler)
+        except Exception as e:
+            logging.debug(str(e))
+            logging.info('sleep({})'.format(interval))
+            time.sleep(interval)
+        else:
+            break
+        if time.time() > maxtime:
+            logging.error('time out in checl_ipcontroller')
+            raise Exception('Timeout')
+
+
+def start_controller(executor='ipyparallel',
+                     profile_dir=None,
+                     bin_path=None,
+                     monitor_period=None,
+                     port=None):
 
     if bin_path is None:
         bin_path = sys.exec_prefix
@@ -113,51 +150,83 @@ def ipcontroller(profile_dir=None, bin_path=None, monitor_period=None):
     else:
         monitor_option = " --HeartMonitor.period={:d}".format(monitor_period)
 
-    cmd_template = ("{bin_path}/ipcontroller"
-                    " {monitor_option}"
-                    " --ip=*"
-                    " --nodb"
-                    " --profile-dir={profile_dir}")
+    if not port:
+        port_option = ''
+    else:
+        port_option = " --port {port:d}".format(port)
+
+    if executor == 'ipyparallel':
+        cmd_template = ("{bin_path}/ipcontroller"
+                        " {monitor_option}"
+                        " --ip=*"
+                        " --nodb"
+                        " --profile-dir={profile_dir}")
+    elif executor == 'distributed':
+        cmd_template = ("{bin_path}/dscheduler"
+                        " --no-bokeh"
+                        " --no-show"
+                        " {port_option}"
+                        " --profile-dir={profile_dir}")
+    else:
+        raise ValueError('Unknow executor type: {}'.format(executor))
 
     p_cmd = cmd_template.format(bin_path=bin_path,
                                 profile_dir=profile_dir,
-                                monitor_option=monitor_option)
+                                monitor_option=monitor_option,
+                                port_option=port_option)
 
     print(p_cmd)
-    # log_file.write(p_cmd)
-    # log_file.write('\n')
     p = Popen(p_cmd, shell=True)
 
     return p
 
 
-def ipengine(profile_dir=None, bin_path=None):
+def start_worker(executor='ipyparallel',
+                 profile_dir=None,
+                 dscheduler=None,
+                 nthreads=1,
+                 nprocs=1,
+                 bin_path=None):
 
     if bin_path is None:
         bin_path = sys.exec_prefix
     if profile_dir is None:
         profile_dir = os.getcwd()
 
-    cmd_template = ("{bin_path}/ipengine" " --profile-dir={profile_dir}")
+    if executor == 'ipyparallel':
+        cmd_template = ("{bin_path}/ipengine --profile-dir={profile_dir}")
+    elif executor == 'distributed':
+        cmd_template = (
+            "{bin_path}/dworker --nthreads {nthreads} --nprocs {nprocs} {dscheduler}")
+    else:
+        raise ValueError('Unknow executor type: {}'.format(executor))
 
-    p_cmd = cmd_template.format(bin_path=bin_path, profile_dir=profile_dir)
+    p_cmd = cmd_template.format(profile_dir=profile_dir,
+                                dscheduler=dscheduler,
+                                nthreads=nthreads,
+                                nprocs=nprocs,
+                                bin_path=bin_path)
 
     print(p_cmd)
-    # log_file.write(p_cmd)
-    # log_file.write('\n')
     p = Popen(p_cmd, shell=True)
 
     return p
 
 
-@click.command(help="Launch wowp with ipyparallel on a slurm cluster")
+@click.command(help="Launch wowp on a slurm cluster")
+@click.option('--executor',
+              '-e',
+              default='ipyparallel',
+              type=click.Choice(['ipyparallel', 'distributed']),
+              show_default=True,
+              help="Executor type")
 @click.option(
     '--pcluster',
+    '-p',
     default=cpus_on_node,
     type=int,
     show_default=True,
-    help=
-    "Number of processes per single cluter, default to one cluster per node")
+    help="Number of processes per single cluter, default to one cluster per node")
 @click.option('--profiles-dir',
               'profiles_dir',
               default=None,
@@ -168,12 +237,12 @@ def ipengine(profile_dir=None, bin_path=None):
               default=0,
               type=int,
               help="Monitor period in ms")
-@click.argument('script',
-                nargs=1,
-                required=False,
-                type=click.Path(exists=True))
+@click.option('--job-file',
+              'job_file',
+              help='Job status file, processes exit when deleted')
+@click.argument('script', nargs=1, required=False, type=click.Path(exists=True))
 @click.pass_context
-def main(ctx, pcluster, profiles_dir, monitor_period, script):
+def main(ctx, executor, pcluster, profiles_dir, monitor_period, job_file, script):
 
     # there seems to be a confusion
     # (https://groups.google.com/forum/#!topic/slurm-devel/3tLPgShGM9A)
@@ -220,8 +289,8 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
     # print("local_id: {}".format(local_id))
 
     msg = str(locals())
-    instat_log_file("locals_{:02d}_{:02d}".format(
-        int(node_id), int(local_id)), msg)
+    # instant_log_file("locals_{:02d}_{:02d}".format(int(node_id), int(local_id)), msg)
+    logging.debug(msg)
 
     def get_profile_dir(n):
         return os.path.join(profiles_dir, '_profile_{}_{}'.format(jobid, n))
@@ -229,8 +298,8 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
     if node_id in controller_node_ids and local_id == 0:
         profile_dir = get_profile_dir(node_id)
         # start ipcontroller
-        p_controllers.append({'proc': ipcontroller(profile_dir=profile_dir,
-                                                   bin_path=bin_path),
+        p_controllers.append({'proc': start_controller(profile_dir=profile_dir,
+                                                       bin_path=bin_path),
                               'profile_dir': profile_dir})
 
     else:
@@ -239,7 +308,9 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
         # wait for controller
         check_ipcontroller(profile_dir, interval=5)
         # start engine
-        p_engines.append(ipengine(profile_dir=profile_dir, bin_path=bin_path))
+        p_engines.append(start_worker(executor=executor,
+                                      profile_dir=profile_dir,
+                                      bin_path=bin_path))
 
     print('--- launched ---')
     print(p_controllers)
@@ -251,7 +322,7 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
         all_profile_dirs = [get_profile_dir(n) for n in controller_node_ids]
         # wait for all controllers
         msg = "wait for controllers before script"
-        instat_log_file("wowp_log_wait", msg)
+        instant_log_file("wowp_log_wait", msg)
         for profile_dir in all_profile_dirs:
             check_ipcontroller(profile_dir, interval=5)
 
@@ -261,11 +332,10 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
             # run the script
             msg = 'running {}'.format(script)
             print(msg)
-            instat_log_file("wowp_log_wait", msg)
+            instant_log_file("wowp_log_wait", msg)
             # script_globals = {'WOWP_IPY_PROFILE_DIRS': all_profile_dirs}
             # exec_args = (compile(open(script).read(), script, 'exec'), script_globals)
-            os.environ['WOWP_IPY_PROFILE_DIRS'] = os.pathsep.join(
-                all_profile_dirs)
+            os.environ['WOWP_IPY_PROFILE_DIRS'] = os.pathsep.join(all_profile_dirs)
             os.environ['WOWP_EXECUTOR'] = 'ipyparallel'
             exec_args = (compile(open(script).read(), script, 'exec'), )
 
@@ -293,7 +363,7 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
 
                     msg = "stdo:\n{}\nstde:\n{}\n".format('\n'.join(stdout),
                                                           '\n'.join(stderr))
-                    instat_log_file("script_std_{:02d}_{:02d}".format(
+                    instant_log_file("script_std_{:02d}_{:02d}".format(
                         int(node_id), int(local_id)), msg)
 
             # try:
@@ -311,16 +381,18 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
                     except:
                         print('could not kill a controller')
             print('\n--done--')
+            if job_file:
+                logging.info('remove {} and exit'.format(job_file))
+                os.remove(job_file)
             sys.exit(0)
         else:
             # print scheduler info
-            msg = (
-                ("WOW:-P scheduler available:\n"
-                 "FuturesScheduler('ipyparallel', "
-                 "executor_kwargs={{'profile_dirs': {profile_dirs}}})").format(
-                     profile_dirs=all_profile_dirs))
+            msg = (("WOW:-P scheduler available:\n"
+                    "FuturesScheduler('ipyparallel', "
+                    "executor_kwargs={{'profile_dirs': {profile_dirs}}})").format(
+                        profile_dirs=all_profile_dirs))
             print(msg)
-            instat_log_file("wowp_log_wait", msg)
+            instant_log_file("wowp_log_wait", msg)
 
     if DUMMY:
         print('dummy -> exit')
@@ -329,8 +401,12 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
     # wait for sigterm
     print('wait for sigterm')
     try:
+        logging.info('Entering infinite loop, wait for sigterm')
         while True:
-            pass
+            time.sleep(0.1)
+            if job_file and not os.path.exists(job_file):
+                logging.info('Job file {} not found --> exit'.format(job_file))
+                break
     except KeyboardInterrupt:
         print('\nTerminating processes')
     finally:
@@ -347,11 +423,5 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
         print('\n--done--')
 
 
-def start():
-    print('start -> main')
-    main()
-
-
 if __name__ == '__main__':
-    print('__main__')
-    start()
+    main()

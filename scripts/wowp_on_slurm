@@ -33,7 +33,7 @@ def stdoutIO(stream='stdout'):
     setattr(sys, stream, old)
 
 
-def instat_log_file(filename, msg, mode="w"):
+def instant_log_file(filename, msg, mode="w"):
     now = str(datetime.datetime.now())
     if DUMMY:
         print("{}\n{}\n{}".format(filename, now, msg))
@@ -156,8 +156,7 @@ def ipengine(profile_dir=None, bin_path=None):
     default=cpus_on_node,
     type=int,
     show_default=True,
-    help=
-    "Number of processes per single cluter, default to one cluster per node")
+    help="Number of processes per single cluter, default to one cluster per node")
 @click.option('--profiles-dir',
               'profiles_dir',
               default=None,
@@ -168,12 +167,10 @@ def ipengine(profile_dir=None, bin_path=None):
               default=0,
               type=int,
               help="Monitor period in ms")
-@click.argument('script',
-                nargs=1,
-                required=False,
-                type=click.Path(exists=True))
+@click.option('--debug', 'debug', default=False, type=bool, help="Extra debug output")
+@click.argument('script', nargs=1, required=False, type=click.Path(exists=True))
 @click.pass_context
-def main(ctx, pcluster, profiles_dir, monitor_period, script):
+def main(ctx, pcluster, profiles_dir, monitor_period, debug, script):
 
     # there seems to be a confusion
     # (https://groups.google.com/forum/#!topic/slurm-devel/3tLPgShGM9A)
@@ -220,8 +217,8 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
     # print("local_id: {}".format(local_id))
 
     msg = str(locals())
-    instat_log_file("locals_{:02d}_{:02d}".format(
-        int(node_id), int(local_id)), msg)
+    if debug:
+        instant_log_file("locals_{:02d}_{:02d}".format(int(node_id), int(local_id)), msg)
 
     def get_profile_dir(n):
         return os.path.join(profiles_dir, '_profile_{}_{}'.format(jobid, n))
@@ -251,7 +248,8 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
         all_profile_dirs = [get_profile_dir(n) for n in controller_node_ids]
         # wait for all controllers
         msg = "wait for controllers before script"
-        instat_log_file("wowp_log_wait", msg)
+        if debug:
+            instant_log_file("wowp_log_wait", msg)
         for profile_dir in all_profile_dirs:
             check_ipcontroller(profile_dir, interval=5)
 
@@ -261,11 +259,11 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
             # run the script
             msg = 'running {}'.format(script)
             print(msg)
-            instat_log_file("wowp_log_wait", msg)
+            if debug:
+                instant_log_file("wowp_log_wait", msg)
             # script_globals = {'WOWP_IPY_PROFILE_DIRS': all_profile_dirs}
             # exec_args = (compile(open(script).read(), script, 'exec'), script_globals)
-            os.environ['WOWP_IPY_PROFILE_DIRS'] = os.pathsep.join(
-                all_profile_dirs)
+            os.environ['WOWP_IPY_PROFILE_DIRS'] = os.pathsep.join(all_profile_dirs)
             os.environ['WOWP_EXECUTOR'] = 'ipyparallel'
             exec_args = (compile(open(script).read(), script, 'exec'), )
 
@@ -293,8 +291,9 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
 
                     msg = "stdo:\n{}\nstde:\n{}\n".format('\n'.join(stdout),
                                                           '\n'.join(stderr))
-                    instat_log_file("script_std_{:02d}_{:02d}".format(
-                        int(node_id), int(local_id)), msg)
+                    if debug:
+                        instant_log_file("script_std_{:02d}_{:02d}".format(
+                            int(node_id), int(local_id)), msg)
 
             # try:
             #     six.exec_(*exec_args)
@@ -314,13 +313,13 @@ def main(ctx, pcluster, profiles_dir, monitor_period, script):
             sys.exit(0)
         else:
             # print scheduler info
-            msg = (
-                ("WOW:-P scheduler available:\n"
-                 "FuturesScheduler('ipyparallel', "
-                 "executor_kwargs={{'profile_dirs': {profile_dirs}}})").format(
-                     profile_dirs=all_profile_dirs))
+            msg = (("WOW:-P scheduler available:\n"
+                    "FuturesScheduler('ipyparallel', "
+                    "executor_kwargs={{'profile_dirs': {profile_dirs}}})").format(
+                        profile_dirs=all_profile_dirs))
             print(msg)
-            instat_log_file("wowp_log_wait", msg)
+            if debug:
+                instant_log_file("wowp_log_wait", msg)
 
     if DUMMY:
         print('dummy -> exit')

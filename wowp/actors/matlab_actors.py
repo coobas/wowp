@@ -12,6 +12,7 @@ import matlab.engine
 from warnings import warn
 import six
 
+
 class EngineManager(object):
     """Matlab engine with a shared pool"""
 
@@ -66,7 +67,7 @@ class MatlabMethod(Actor):
     def __init__(self, method_name, inports=(), outports='result'):
         self.method_name = method_name
 
-        super().__init__(name=self.method_name)
+        super(MatlabMethod, self).__init__(name=self.method_name)
 
         if isinstance(inports, six.string_types):
             inports = (inports,)

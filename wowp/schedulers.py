@@ -16,6 +16,13 @@ try:
 except ImportError:
     warnings.warn(
         'ipyparallel not installed: IPyClusterScheduler cannot be used')
+try:
+    from mpi4py import MPI
+except ImportError:
+    warnings.warn(
+        'mpi4py not installed: mpi4py cannot be used')
+from .util import MPI_TAGS, loads, dumps
+import itertools
 
 
 class _ActorRunner(object):
@@ -168,6 +175,49 @@ class MultiprocessingExecutor(object):
         """
         job = self._pool.submit(func, *args, **kwargs)
         return FutureJob(job)
+
+
+class MPIExecutor(object):
+    """Executes jobs in local subprocesses using concurrent.futures
+    """
+
+    _jobid_counter = itertools.count()
+    available_workers = []
+
+    def __init__(self):
+        self.comm = MPI.COMM_WORLD   # get MPI communicator object
+        self.size = self.comm.size        # total number of processes
+        self.rank = self.comm.rank        # rank of this process
+        self.status = MPI.Status()   # get MPI status object
+        # list of workers + their status
+        self.workers = {}
+
+        self.num_workers = self.size - 1
+        print("Master starting with %d workers" % self.num_workers)
+        # collect worker READY messages
+        # TODO choose minimum number and timeout
+        while len(self.workers) < self.num_workers:
+            data = self.comm.recv(source=MPI.ANY_SOURCE, tag=MPI_TAGS.READY, status=self.status)
+            source = self.status.Get_source()
+            self.workers[source] = {'ready_message': data}
+            logger.info('worker {} in, {}/{}'.format(source, len(self.workers), self.num_workers))
+            self.available_workers.append(source)
+
+    def submit(self, func, *args, **kwargs):
+        """Submit a function: func(*args, **kwargs) and return a FutureJob.
+        """
+        worker = self.available_workers.pop()
+        job = (func, args, kwargs)
+        # jobid = hash(job)
+        jobid = next(self._jobid_counter)
+        job_pickle = dumps((jobid, job))
+        self.comm.send(job_pickle, dest=worker, tag=MPI_TAGS.START)
+        # job = {'worker': worker, 'jobid': jobid}
+        return FutureMPIJob(jobid, job, worker, self)
+
+    def __del__(self):
+        for worker in self.workers:
+            self.comm.bcast(None, root=0, tag=MPI_TAGS.EXIT)
 
 
 class LocalExecutor(object):
@@ -347,6 +397,56 @@ class FutureIpyJob(object):
 
     def display_outputs(self):
         return self._job.display_outputs()
+
+
+class FutureMPIJob(object):
+    """Wraps asynchronous results of different kinds into a future-like object
+    """
+
+    _submitted = {}
+    _received = {}
+
+    def __init__(self, jobid, job, worker, executor):
+        func, args, kwargs = job
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.worker = worker
+        self.started = datetime.datetime.now()
+        self.completed = None
+        self.engine_id = worker
+        self.error = None
+        self.executor = executor
+        self.request = MPI.COMM_WORLD.irecv(source=worker, tag=MPI_TAGS.DONE)
+        self._done = False
+        self._result = None
+
+    def done(self):
+        if not self._done:
+            flag, rmess = self.request.test()
+            self._done = flag
+            self._result = rmess
+        if self._done:
+            self.completed = datetime.datetime.now()
+            self.executor.available_workers.append(self.worker)
+        return self._done
+
+    def result(self, timeout=None):
+        if timeout is not None:
+            raise NotImplementedError('finite timeout not implemented yet')
+        if self.done():
+            res_pickle = self._result
+        else:
+            res_pickle = self.request.wait()
+            self._done = True
+            self._result = res_pickle
+            self.completed = datetime.datetime.now()
+            self.executor.available_workers.append(self.worker)
+        res = loads(res_pickle)
+        return res
+
+    def display_outputs(self):
+        return 'Sorry, not implemented for MPI :-('
 
 
 class _IPySystemJob(object):

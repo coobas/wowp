@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+from mpi4py import MPI
+from wowp.util import MPI_TAGS, loads, dumps
+
+
+# Initializations and preliminaries
+comm = MPI.COMM_WORLD   # get MPI communicator object
+size = comm.size        # total number of processes
+rank = comm.rank        # rank of this process
+status = MPI.Status()   # get MPI status object
+
+if rank == 0:
+    # Master process executes code below
+    from IPython import embed, embed_kernel
+    embed_kernel()
+    # tasks = range(2*size)
+    # task_index = 0
+    # num_workers = size - 1
+    # closed_workers = 0
+    # print("Master starting with %d workers" % num_workers)
+    # while closed_workers < num_workers:
+    #     data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+    #     source = status.Get_source()
+    #     tag = status.Get_tag()
+    #     if tag == MPI_TAGS.READY:
+    #         # Worker is ready, so send it a task
+    #         if task_index < len(tasks):
+    #             comm.send(tasks[task_index], dest=source, tag=MPI_TAGS.START)
+    #             print("Sending task %d to worker %d" % (task_index, source))
+    #             task_index += 1
+    #         else:
+    #             comm.send(None, dest=source, tag=MPI_TAGS.EXIT)
+    #     elif tag == MPI_TAGS.DONE:
+    #         results = data
+    #         print("Got data from worker %d" % source)
+    #     elif tag == MPI_TAGS.EXIT:
+    #         print("Worker %d exited." % source)
+    #         closed_workers += 1
+
+    # print("Master finishing")
+
+else:
+    # Worker processes execute the code below
+    name = MPI.Get_processor_name()
+    print("I am a worker with rank %d on %s." % (rank, name))
+    msg = {"rank": rank, "name": name}
+    comm.send(msg, dest=0, tag=MPI_TAGS.READY)
+    while True:
+        job_pickle = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+        tag = status.Get_tag()
+
+        if tag == MPI_TAGS.START:
+            jobid, job = loads(job_pickle)
+            func, args, kwargs = job
+            # Do the work here
+            res = func(*args, **kwargs)
+            print('res: {}'.format(res))
+            res_pickle = dumps(res)
+            comm.send(res_pickle, dest=0, tag=MPI_TAGS.DONE)
+        elif tag == MPI_TAGS.EXIT:
+            break
+
+    # comm.send(None, dest=0, tag=MPI_TAGS.EXIT)

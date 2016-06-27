@@ -14,6 +14,23 @@ try:
         from thread import get_ident as _get_ident
 except ImportError:
     from dummy_threading import get_ident as _get_ident
+# import a pickling module
+import pickle
+my_pickle = pickle
+# try dill
+try:
+    import dill
+    _IS_DILL = True
+    my_pickle = dill
+except ImportError:
+    _IS_DILL = False
+# cludpickle is default
+try:
+    import cloudpickle
+    _IS_CLOUDPICKLE = True
+    my_pickle = cloudpickle
+except ImportError:
+    _IS_CLOUDPICKLE = False
 
 
 class ListDict(_OrderedDict):
@@ -165,3 +182,22 @@ class TemporaryDirectory(object):
             self._rmdir(path)
         except OSError:
             pass
+
+
+def enum(*sequential, **named):
+    """Handy way to fake an enumerated type in Python
+    http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
+
+
+MPI_TAGS = enum('READY', 'DONE', 'EXIT', 'START')
+
+
+def dumps(obj):
+    return my_pickle.dumps(obj)
+
+
+def loads(obj):
+    return my_pickle.loads(obj)

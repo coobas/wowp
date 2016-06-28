@@ -74,6 +74,7 @@ class _ActorRunner(object):
     def run_workflow(self, workflow, **kwargs):
         inport_names = tuple(port.name for port in workflow.inports)
         if workflow.scheduler is not None:
+            # TODO this seems a bit strange
             scheduler = workflow.scheduler
         else:
             scheduler = self

@@ -6,6 +6,17 @@ import wowp.schedulers
 import wowp.util
 import six
 import sys
+try:
+    from mpi4py import MPI
+    IS_MPI = True
+    mpi_comm = MPI.COMM_WORLD  # get MPI communicator object
+    mpi_size = mpi_comm.size   # total number of processes
+    mpi_rank = mpi_comm.rank   # rank of this process
+    mpi_status = MPI.Status()  # get MPI status object
+    print(mpi_size)
+    print(mpi_rank)
+except ImportError:
+    IS_MPI = False
 
 
 @click.command(help="Execute a WOW:-P workflow")
@@ -90,4 +101,11 @@ def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
 
 
 if __name__ == '__main__':
-    main()
+    if IS_MPI and mpi_size > 1 and mpi_rank == 0:
+        print('MPI world available, size {size}'.format(size=mpi_size))
+
+    if IS_MPI and mpi_rank > 0:
+        from wowp.schedulers import mpi_worker
+        mpi_worker()
+    else:
+        main()

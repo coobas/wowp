@@ -10,6 +10,7 @@ import datetime
 import six
 import traceback
 from .logger import logger
+import os
 
 try:
     from ipyparallel import Client, RemoteError
@@ -178,6 +179,43 @@ class MultiprocessingExecutor(object):
         return FutureJob(job)
 
 
+def mpi_worker():
+    """Start a single MPI worker node
+    """
+    from mpi4py import MPI
+    from wowp.util import MPI_TAGS, loads, dumps
+
+    comm = MPI.COMM_WORLD   # get MPI communicator object
+    rank = comm.rank        # rank of this process
+    status = MPI.Status()   # get MPI status object
+
+    # say hello to the master
+    name = MPI.Get_processor_name()
+    print("I am a WOW:-P MPI worker with rank %d on %s." % (rank, name))
+    msg = {"rank": rank, "name": name, 'pid': os.getpid()}
+    comm.send(msg, dest=0, tag=MPI_TAGS.READY)
+    myid = 'worker {rank}/{name}/{pid}'.format(**msg)
+
+    # wait for jobs
+    while True:
+        job_pickle = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+        tag = status.Get_tag()
+
+        if tag == MPI_TAGS.START:
+            jobid, job = loads(job_pickle)
+            func, args, kwargs = job
+            print("{myid}: runnin {func}".format(myid=myid, func=func))
+            # Do the work here
+            res = func(*args, **kwargs)
+            print("{myid}: finished {func}".format(myid=myid, func=func))
+            res_pickle = dumps(res)
+            comm.send(res_pickle, dest=0, tag=MPI_TAGS.DONE)
+            print("{myid}: sending result".format(myid=myid))
+        elif tag == MPI_TAGS.EXIT:
+            print("{myid}: exit".format(myid=myid))
+            break
+
+
 class MPIExecutor(object):
     """Executes jobs in local subprocesses using concurrent.futures
     """
@@ -218,7 +256,7 @@ class MPIExecutor(object):
 
     def __del__(self):
         for worker in self.workers:
-            self.comm.bcast(None, root=0, tag=MPI_TAGS.EXIT)
+            self.comm.send(None, dest=worker, tag=MPI_TAGS.EXIT)
 
 
 class LocalExecutor(object):
@@ -761,7 +799,7 @@ class FuturesScheduler(_ActorRunner):
     """Scheduler using PEP 3148 futures
 
     Args:
-        executor (str): executor type: multiprocessing, distributed, ipyparallel
+        executor (str): executor type: multiprocessing, distributed, ipyparallel, mpi
         display_outputs (Optional[bool]): display stdout/err from actors [False]
         timeout (Optional): timeout in secs for waiting for ipyparallel cluster [60]
         min_engines (Optional[int]): minimum number of engines [1]
@@ -801,6 +839,8 @@ class FuturesScheduler(_ActorRunner):
                           display_outputs=display_outputs)
             kwargs.update(executor_kwargs)
             self.executor = IpyparallelExecutor(**kwargs)
+        elif executor == 'mpi':
+            self.executor = MPIExecutor()
         # elif executor == 'scoop':
         #     self.executor = ScoopExecutor()
         self.system_executor = LocalExecutor()

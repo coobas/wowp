@@ -21,6 +21,11 @@ import sys
     help="File with inputs",
     type=click.Path(exists=True))
 @click.option(
+    '--output',
+    '-o',
+    help="Output file, results are saved using wowp.util.dump",
+    type=click.Path(exists=False))
+@click.option(
     '--arg',
     '-a',
     multiple=True,
@@ -28,13 +33,12 @@ import sys
           " Values are processed by eval. Overrides inputs."),
     type=(str, str))
 @click.option(
-    '--output',
-    '-o',
-    help="Output file, results are saved using wowp.util.dump",
-    type=click.Path(exists=False))
-@click.argument('workflow', nargs=1, type=click.Path(exists=True))
+    '--ipykernel/--no-ipykernel',
+    help="Start an IPython kernel instead of exiting",
+    default=False)
+@click.argument('workflow', nargs=1, required=False, type=click.Path(exists=True))
 @click.pass_context
-def main(ctx, scheduler, workflow, output, inputs, arg):
+def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
     print("WOW:-Ping {workflow} with {scheduler}".format(scheduler=scheduler, workflow=workflow))
     with open(workflow, 'r') as wffile:
         try:
@@ -78,6 +82,11 @@ def main(ctx, scheduler, workflow, output, inputs, arg):
     if output:
         with open(output, 'wb') as fo:
             wowp.util.dump(res, fo)
+
+    if ipykernel:
+        from IPython import embed_kernel
+        ipy_context = {'workflow': workflow, 'scheduler': scheduler, 'kwargs': kwargs}
+        embed_kernel(local_ns=ipy_context)
 
 
 if __name__ == '__main__':

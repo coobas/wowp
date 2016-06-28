@@ -201,3 +201,11 @@ def dumps(obj):
 
 def loads(obj):
     return my_pickle.loads(obj)
+
+
+def dump(obj, file):
+    return my_pickle.dump(obj, file)
+
+
+def load(obj, file):
+    return my_pickle.load(obj, file)

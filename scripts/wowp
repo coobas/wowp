@@ -2,21 +2,83 @@
 # -*- coding: utf-8 -*-
 
 import click
+import wowp.schedulers
+import wowp.util
+import six
+import sys
 
 
-@click.command(help="Execute WOW:-P workflow")
+@click.command(help="Execute a WOW:-P workflow")
 @click.option(
     '--scheduler',
-    help="Scheduler")
+    '-s',
+    help="Scheduler incl. parameters, default 'LinearizedScheduler()'",
+    type=str,
+    default="LinearizedScheduler()")
+@click.option(
+    '--inputs',
+    '-i',
+    help="File with inputs",
+    type=click.Path(exists=True))
+@click.option(
+    '--arg',
+    '-a',
+    multiple=True,
+    help=("Input port names and values, e.g. -i x 2 will set input port x to 2."
+          " Values are processed by eval. Overrides inputs."),
+    type=(str, str))
+@click.option(
+    '--output',
+    '-o',
+    help="Output file, results are saved using wowp.util.dump",
+    type=click.Path(exists=False))
 @click.argument('workflow', nargs=1, type=click.Path(exists=True))
 @click.pass_context
-def main(ctx, scheduler, workflow):
-    print("Hello WOW:-P")
+def main(ctx, scheduler, workflow, output, inputs, arg):
+    print("WOW:-Ping {workflow} with {scheduler}".format(scheduler=scheduler, workflow=workflow))
+    with open(workflow, 'r') as wffile:
+        try:
+            exec_context = {}
+            six.exec_(wffile.read(), exec_context)
+        except Exception:
+            print('Error executing the workflow file:')
+            six.reraise(*sys.exc_info())
+    if 'WORKFLOW' not in exec_context:
+        raise ValueError('WORKFLOW must be defined in the workflow file')
+    workflow = exec_context['WORKFLOW']
+    # TODO temporary
+    # inputs = exec_context['INPUTS']
+    kwargs = {}
+    if inputs:
+        with open(inputs, 'r') as inpfile:
+            try:
+                exec_context = {}
+                six.exec_(inpfile.read(), exec_context)
+            except Exception:
+                print('Error executing the workflow file:')
+                six.reraise(*sys.exc_info())
+        if 'INPUTS' not in exec_context or not isinstance(exec_context['INPUTS'], dict):
+            raise ValueError('INPUTS dictionary must be defined in the workflow file')
+        kwargs.update(exec_context['INPUTS'])
+    # assing inputs passed from command line
+    for k, v in arg:
+        kwargs[k] = eval(v, {})
+    print(kwargs)
+    try:
+        scheduler = eval("wowp.schedulers.{}".format(scheduler))
+    except AttributeError:
+        raise('Scheduler {scheduler} not found'.format(scheduler=scheduler))
 
-
-def start():
-    main()
+    # run the workflow
+    scheduler.run_workflow(workflow, **kwargs)
+    res = {port.name: port.pop_all() for port in workflow.outports}
+    print('Result:')
+    print(res)
+    # save to file
+    if output:
+        with open(output, 'wb') as fo:
+            wowp.util.dump(res, fo)
 
 
 if __name__ == '__main__':
-    start()
+    main()

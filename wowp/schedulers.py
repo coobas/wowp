@@ -11,6 +11,7 @@ import six
 import traceback
 from .logger import logger
 import os
+import random
 
 try:
     from ipyparallel import Client, RemoteError
@@ -232,6 +233,8 @@ class MPIExecutor(object):
         self.workers = {}
 
         self.num_workers = self.size - 1
+        if self.num_workers < 1:
+            raise Exception('Not enough MPI workers')
         print("Master starting with %d workers" % self.num_workers)
         # collect worker READY messages
         # TODO choose minimum number and timeout
@@ -241,11 +244,16 @@ class MPIExecutor(object):
             self.workers[source] = {'ready_message': data}
             logger.info('worker {} in, {}/{}'.format(source, len(self.workers), self.num_workers))
             self.available_workers.append(source)
+        self.workers_cycle = itertools.cycle(self.workers.keys())
 
     def submit(self, func, *args, **kwargs):
         """Submit a function: func(*args, **kwargs) and return a FutureJob.
         """
-        worker = self.available_workers.pop()
+        # worker = self.available_workers.pop()
+        # random choice workers
+        # worker = random.choice(self.available_workers)
+        # Round-Robin
+        worker = next(self.workers_cycle)
         job = (func, args, kwargs)
         # jobid = hash(job)
         jobid = next(self._jobid_counter)
@@ -325,6 +333,7 @@ class IpyparallelExecutor(object):
             kwargs = {cli_arg: value}
             if client_kwargs:
                 kwargs.update(client_kwargs)
+            # TODO min_engines divide by len(profile_dirs)
             self._ipy_rc.append(self.init_cluster(min_engines, timeout, **
                                                   kwargs))
             self._ipy_dv.append(self._ipy_rc[-1][:])
@@ -467,7 +476,7 @@ class FutureMPIJob(object):
             self._result = rmess
         if self._done:
             self.completed = datetime.datetime.now()
-            self.executor.available_workers.append(self.worker)
+            # self.executor.available_workers.append(self.worker)
         return self._done
 
     def result(self, timeout=None):
@@ -480,7 +489,7 @@ class FutureMPIJob(object):
             self._done = True
             self._result = res_pickle
             self.completed = datetime.datetime.now()
-            self.executor.available_workers.append(self.worker)
+            # self.executor.available_workers.append(self.worker)
         res = loads(res_pickle)
         return res
 
@@ -811,39 +820,51 @@ class FuturesScheduler(_ActorRunner):
                  display_outputs=False,
                  min_engines=1,
                  timeout=60,
-                 executor_kwargs=None):
+                 executor_kwargs=None,
+                 copy_from=None):
 
         if executor_kwargs is None:
             executor_kwargs = {}
 
         # for .copy()
-        frame = inspect.currentframe()
-        args, varargs, keywords, values = inspect.getargvalues(frame)
-        self._init_args = [values[k] for k in args[1:]]
-        if keywords:
-            self._init_kwargs = {k: values[k] for k in keywords}
-        else:
-            self._init_kwargs = {}
-
+        # frame = inspect.currentframe()
+        # args, varargs, keywords, values = inspect.getargvalues(frame)
+        # self._init_args = [values[k] for k in args[1:]]
+        # if keywords:
+        #     self._init_kwargs = {k: values[k] for k in keywords if k not in ('copy_from', )}
+        # else:
+        #     self._init_kwargs = {}
+        self._init_args = (executor, )
+        self._init_kwargs = {'display_outputs': display_outputs,
+                             'min_engines': min_engines,
+                             'timeout': timeout,
+                             'executor_kwargs': executor_kwargs}
         self.display_outputs = display_outputs
 
-        if executor == 'multiprocessing':
-            self.executor = MultiprocessingExecutor(processes=min_engines)
-        elif executor == 'distributed':
-            self.executor = DistributedExecutor(uris=executor_kwargs['uris'],
-                                                min_engines=min_engines,
-                                                timeout=timeout)
-        elif executor == 'ipyparallel':
-            kwargs = dict(min_engines=min_engines,
-                          timeout=timeout,
-                          display_outputs=display_outputs)
-            kwargs.update(executor_kwargs)
-            self.executor = IpyparallelExecutor(**kwargs)
-        elif executor == 'mpi':
-            self.executor = MPIExecutor()
-        # elif executor == 'scoop':
-        #     self.executor = ScoopExecutor()
-        self.system_executor = LocalExecutor()
+        if copy_from is None:
+            if executor == 'multiprocessing':
+                self.executor = MultiprocessingExecutor(processes=min_engines)
+            elif executor == 'distributed':
+                self.executor = DistributedExecutor(uris=executor_kwargs['uris'],
+                                                    min_engines=min_engines,
+                                                    timeout=timeout)
+            elif executor == 'ipyparallel':
+                kwargs = dict(min_engines=min_engines,
+                              timeout=timeout,
+                              display_outputs=display_outputs)
+                kwargs.update(executor_kwargs)
+                self.executor = IpyparallelExecutor(**kwargs)
+            elif executor == 'mpi':
+                self.executor = MPIExecutor()
+            # elif executor == 'scoop':
+            #     self.executor = ScoopExecutor()
+            else:
+                raise ValueError('Executor {} unknown'.format(executor))
+            self.system_executor = LocalExecutor()
+        else:
+            # executors must be shared across copies to avoid their initialization
+            self.executor = copy_from.executor
+            self.system_executor = copy_from.system_executor
 
         self.reset()
 
@@ -872,7 +893,7 @@ class FuturesScheduler(_ActorRunner):
         return res
 
     def copy(self):
-        return self.__class__(*self._init_args, **self._init_kwargs)
+        return self.__class__(*self._init_args, copy_from=self, **self._init_kwargs)
 
     def put_value(self, in_port, value):
         self.execution_queue.appendleft((in_port, value))

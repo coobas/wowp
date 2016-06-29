@@ -13,8 +13,6 @@ try:
     mpi_size = mpi_comm.size   # total number of processes
     mpi_rank = mpi_comm.rank   # rank of this process
     mpi_status = MPI.Status()  # get MPI status object
-    print(mpi_size)
-    print(mpi_rank)
 except ImportError:
     IS_MPI = False
 
@@ -50,6 +48,18 @@ except ImportError:
 @click.argument('workflow', nargs=1, required=False, type=click.Path(exists=True))
 @click.pass_context
 def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
+
+    # detect MPI scheduler
+    # TODO this test might be too simple
+    if 'mpi' in scheduler.lower() and IS_MPI:
+        if mpi_rank > 0:
+            print('MPI worker rank {}'.format(mpi_rank))
+            from wowp.schedulers import mpi_worker
+            mpi_worker()
+            return
+        else:
+            print('This is MPI master :-P')
+
     print("WOW:-Ping {workflow} with {scheduler}".format(scheduler=scheduler, workflow=workflow))
     with open(workflow, 'r') as wffile:
         try:
@@ -79,12 +89,15 @@ def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
     for k, v in arg:
         kwargs[k] = eval(v, {})
     print(kwargs)
+
     try:
+        print('init scheduler')
         scheduler = eval("wowp.schedulers.{}".format(scheduler))
     except AttributeError:
         raise('Scheduler {scheduler} not found'.format(scheduler=scheduler))
 
     # run the workflow
+    print("scheduler.run_workflow")
     scheduler.run_workflow(workflow, **kwargs)
     res = {port.name: port.pop_all() for port in workflow.outports}
     print('Result:')
@@ -101,11 +114,4 @@ def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
 
 
 if __name__ == '__main__':
-    if IS_MPI and mpi_size > 1 and mpi_rank == 0:
-        print('MPI world available, size {size}'.format(size=mpi_size))
-
-    if IS_MPI and mpi_rank > 0:
-        from wowp.schedulers import mpi_worker
-        mpi_worker()
-    else:
-        main()
+    main()

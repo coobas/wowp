@@ -4,6 +4,8 @@
 import click
 import wowp.schedulers
 import wowp.util
+from wowp.logger import logger
+import logging
 import six
 import sys
 try:
@@ -45,9 +47,16 @@ except ImportError:
     '--ipykernel/--no-ipykernel',
     help="Start an IPython kernel instead of exiting",
     default=False)
+@click.option(
+    '--debug/--no-debug',
+    help="Switch debug output on",
+    default=False)
 @click.argument('workflow', nargs=1, required=False, type=click.Path(exists=True))
 @click.pass_context
-def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel):
+def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel, debug):
+
+    if debug:
+        logger.setLevel(logging.DEBUG)
 
     # detect MPI scheduler
     # TODO this test might be too simple

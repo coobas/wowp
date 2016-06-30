@@ -204,8 +204,12 @@ def loads(obj):
 
 
 def dump(obj, file):
+    if isinstance(file, six.string_types):
+        file = open(file, 'wb')
     return my_pickle.dump(obj, file)
 
 
-def load(obj, file):
-    return my_pickle.load(obj, file)
+def load(file):
+    if isinstance(file, six.string_types):
+        file = open(file, 'rb')
+    return my_pickle.load(file)

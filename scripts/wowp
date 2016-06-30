@@ -121,6 +121,8 @@ def main(ctx, scheduler, workflow, inputs, output, arg, ipykernel, debug):
         ipy_context = {'workflow': workflow, 'scheduler': scheduler, 'kwargs': kwargs}
         embed_kernel(local_ns=ipy_context)
 
+    scheduler.shutdown()
+
 
 if __name__ == '__main__':
     main()

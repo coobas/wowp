@@ -95,6 +95,13 @@ class _ActorRunner(object):
         # by default, this method does nothing
         pass
 
+    def shutdown(self):
+        pass
+
+    # def __del__(self):
+    #     self.shutdown()
+    #     super(_ActorRunner, self).__del__()
+
 
 class NaiveScheduler(_ActorRunner):
     """Scheduler that directly calls connected actors.
@@ -241,7 +248,7 @@ class MPIExecutor(object):
         while len(self.workers) < self.num_workers:
             data = self.comm.recv(source=MPI.ANY_SOURCE, tag=MPI_TAGS.READY, status=self.status)
             source = self.status.Get_source()
-            self.workers[source] = {'ready_message': data}
+            self.workers[source] = {'online': True, 'ready_message': data}
             logger.info('worker {} in, {}/{}'.format(source, len(self.workers), self.num_workers))
             self.available_workers.append(source)
         self.workers_cycle = itertools.cycle(self.workers.keys())
@@ -262,9 +269,20 @@ class MPIExecutor(object):
         # job = {'worker': worker, 'jobid': jobid}
         return FutureMPIJob(jobid, job, worker, self)
 
+    def shutdown(self):
+        """Shut down the workers
+        """
+        logger.debug('MPI executor shutdown')
+        for source, worker in self.workers.items():
+            if worker['online']:
+                logger.debug('Shut down MPI worker {}'.format(source))
+                self.comm.send(None, dest=source, tag=MPI_TAGS.EXIT)
+                worker['online'] = False
+
     def __del__(self):
-        for worker in self.workers:
-            self.comm.send(None, dest=worker, tag=MPI_TAGS.EXIT)
+        self.shutdown()
+        if hasattr(super(type(self)), '__del__'):
+            super(type(self), self).__del__()
 
 
 class LocalExecutor(object):
@@ -979,6 +997,16 @@ class FuturesScheduler(_ActorRunner):
                 self.wait_queue.append(in_port.owner)
                 # self.running_actors((in_port.owner, self.run_actor(in_port.owner)))
 
+    def shutdown(self):
+        logger.info('Scheduler is shutting down')
+        if hasattr(self.executor, 'shutdown'):
+            self.executor.shutdown()
+
+    def __del__(self):
+        self.shutdown()
+        if hasattr(super(type(self)), '__del__'):
+            super(type(self), self).__del__()
+
 
 class ThreadedSchedulerWorker(threading.Thread, _ActorRunner):
     """Thread object that executes run after run of the ThreadedScheduler actors.
@@ -1075,3 +1103,6 @@ class ThreadedScheduler(object):
         # print("Everything finished. Waiting for threads to end.")
         for thread in self.threads:
             thread.finish()
+
+    def shutdown(self):
+        pass

@@ -1,6 +1,8 @@
 decorator
 future
-ipyparallel
 networkx
 nose
 six
+click
+ipyparallel
+mpi4py

@@ -20,7 +20,7 @@ setup(
                           'six',
                           'click',
                           ],
-        extras_require={'parallel': ['ipyparallel']},
+        extras_require={'parallel': ['ipyparallel', 'mpi4py']},
         entry_points={
             # 'console_scripts' : [
             #    'wowp = wowp:function_that_does_it_all'

@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-from .util import ListDict, deprecated
+from .util import ListDict, deprecated, abstractmethod
 from collections import deque
 from .logger import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
@@ -386,6 +386,10 @@ class Port(object):
         values = self.buffer
         self.buffer = deque()
         return values
+
+    @abstractmethod
+    def put(self, value):
+        pass
 
 
 class OutPort(Port):

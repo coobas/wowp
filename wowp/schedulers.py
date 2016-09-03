@@ -27,6 +27,15 @@ from .util import MPI_TAGS, loads, dumps
 import itertools
 
 
+__all__ = [
+    "NaiveScheduler",
+    "LinearizedScheduler",
+    "ThreadedScheduler",
+    "IPyClusterScheduler",
+    "MultiprocessingExecutor",
+    "MultiIpyClusterScheduler",
+    "FuturesScheduler"]
+
 class _ActorRunner(object):
     """Base class for objects that run actors and process their results.
 

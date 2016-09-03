@@ -4,7 +4,7 @@ import inspect
 import itertools
 import six
 
-__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge']
+__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge', 'LoopWhile']
 
 
 class FuncActor(Actor):
@@ -298,3 +298,94 @@ class DictionaryMerge(Actor):
     @staticmethod
     def run(*args, **kwargs):
         return {kwargs.get("outport_name"): kwargs.get("values")}
+
+
+class LoopWhile(Actor):
+    """A while loop actor"""
+
+    _system_actor = True
+
+    def __init__(self, name='LoopWhile', condition=None):
+        super(LoopWhile, self).__init__(name=name)
+        # flag for being inside a loop
+        self._in_loop = False
+        # flag for evaluating the condition
+        self._in_condition = False
+        # setup ports
+        self.inports.append('init')
+        self.inports.append('loop')
+        self.outports.append('loop')
+        self.outports.append('exit')
+        self.outports.append('condition_in')
+        self.inports.append('condition_out')
+        if condition is None or isinstance(condition, Actor):
+            self._condition_func = None
+            if isinstance(condition, Actor):
+                if len(condition.outports) != 1 or len(condition.inports) != 1:
+                    raise Exception(
+                        'The condition actor must have exactly 1 in and 1 out port')
+                condition.inports.at(0).connect(self.inports['condition_in'])
+                condition.outports.at(0).connect(self.inports['condition_out'])
+        elif callable(condition):
+            self._condition_func = condition
+        else:
+            raise Exception('condition must be either Actor instance or a callable object')
+
+    def get_run_args(self):
+        # everything is done inside run
+        return (), {}
+
+    def is_condition_actor(self):
+        """Returns True if condition actot is connected
+        """
+        if (self.inports['condition_out'].isconnected() and
+                self.outports['condition_in'].isconnected()):
+            return True
+        elif (self.inports['condition_out'].isconnected() or
+              self.outports['condition_in'].isconnected()):
+            raise Exception('Both condition_in and out must be connected')
+        return False
+
+    def run(self, *args, **kwargs):
+        res = {}
+        condition_out = None
+        if not self._in_loop:
+            # input on init port
+            value = self.inports['init'].pop()
+            self._in_loop = True
+        elif not self.inports['loop'].isempty():
+            # input value from the loop
+            value = self.inports['loop'].pop()
+        elif not self.inports['condition_out'].isempty():
+            # we receive the condition actor output
+            # the value was stored
+            value = self._last_value
+            condition_out = self.inports['condition_out'].pop()
+        else:
+            raise Exception('Enexpected error')
+
+        if condition_out is None:
+            # we have to evaluate the condition
+            if self.is_condition_actor():
+                self._last_value = value
+                res['condition_in'] = value
+                # we have to return here to execute the condition actor
+                return res
+            else:
+                condition_out = self._condition_func(value)
+        if condition_out:
+            res['loop'] = value
+        else:
+            # this is the end - condition is False
+            self._in_loop = False
+            res['exit'] = value
+        return res
+
+    def can_run(self):
+        if self._in_loop:
+            # waitinf for loop
+            res = (not self.inports['loop'].isempty() or
+                   not self.inports['condition_out'].isempty())
+        else:
+            res = not self.inports['init'].isempty()
+        return res

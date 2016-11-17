@@ -107,8 +107,8 @@ class Component(object):
     # TODO create workflow (composite) from actor's connections
 
     def get_workflow(self, name=None):
-        '''Creates a workflow form actor's connections
-        '''
+        """Creates a workflow form actor's connections
+        """
 
         graph = self.graph
         leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
@@ -281,7 +281,6 @@ class Ports(object):
         """Get port by number."""
         key = self.keys()[index]
         return self[key]
-
 
 
 class Port(object):

@@ -1,5 +1,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-from wowp.actors import FuncActor, Switch, ShellRunner, DictionaryMerge
+
+import random
+
+from wowp.actors import FuncActor, Switch, ShellRunner, DictionaryMerge, LoopWhile
 from wowp.schedulers import NaiveScheduler
 from wowp.components import Actor
 import nose
@@ -108,35 +111,48 @@ def test_LoopWhileActor():
         return x + 1
 
     fa = FuncActor(func, outports=('x', ))
-    lw = Switch("a_loop", condition)
-
-    fa.inports['x'] += lw.outports['loop_out']
-    lw.inports['loop_in'] += fa.outports['x']
-
-    lw.inports['loop_in'].put(0)
-
+    lw = LoopWhile("a_loop", condition_func=condition)
+    fa.inports['x'] += lw.outports['loop']
+    lw.inports['loop'] += fa.outports['x']
+    lw.inports['init'].put(0)
     NaiveScheduler().run_actor(lw)
-
-    result = lw.outports['final'].pop()
-
+    result = lw.outports['exit'].pop()
     assert (result == 10)
 
-
-def test_LoopWhileActorWithInner():
-    def condition(x):
-        return x < 10
-
-    def func(x):
-        return x + 1
-
+    # test with condition actor
     fa = FuncActor(func, outports=('x', ))
-    lw = Switch("a_loop", condition, inner_actor=fa)
-
-    lw.inports['loop_in'].put(0)
-
+    ca = FuncActor(condition, outports=('out', ))
+    lw = LoopWhile("a_loop")
+    lw.inports['condition_out'] += ca.outports['out']
+    ca.inports['x'] += lw.outports['condition_in']
+    fa.inports['x'] += lw.outports['loop']
+    lw.inports['loop'] += fa.outports['x']
+    lw.inports['init'].put(0)
     NaiveScheduler().run_actor(lw)
-    result = lw.outports['final'].pop()
+    result = lw.outports['exit'].pop()
     assert (result == 10)
+
+
+def test_SwitchActor():
+
+    for val in (True, False):
+        token = random.randint(0, 100)
+        sw = Switch("switch", lambda x: val)
+        sw.inports['inp'].put(token)
+        pname = 'true' if val else 'false'
+        NaiveScheduler().run_actor(sw)
+        assert sw.outports[pname].pop() == token
+
+    for val in (True, False):
+        token = random.randint(0, 100)
+        sw = Switch("switch")
+        ca = FuncActor(lambda x: val)
+        sw.inports['condition_out'] += ca.outports['out']
+        ca.inports['x'] += sw.outports['condition_in']
+        sw.inports['inp'].put(token)
+        pname = 'true' if val else 'false'
+        NaiveScheduler().run_actor(sw)
+        assert sw.outports[pname].pop() == token
 
 
 def test_Shellrunner():

@@ -139,12 +139,13 @@ class Switch(Actor):
         if not self._in_condition:
             # input on init port
             value = self.inports['inp'].pop()
-            self._in_condition = True
+
         elif not self.inports['condition_out'].isempty():
             # we receive the condition actor output
             # the value was stored
             value = self._last_value
             condition_out = self.inports['condition_out'].pop()
+            self._in_condition = False
         else:
             raise Exception('Enexpected error')
 
@@ -152,6 +153,7 @@ class Switch(Actor):
             # we have to evaluate the condition
             if self.is_condition_actor():
                 self._last_value = value
+                self._in_condition = True
                 res['condition_in'] = value
                 # we have to return here to execute the condition actor
                 return res

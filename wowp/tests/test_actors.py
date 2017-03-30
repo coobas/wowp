@@ -142,6 +142,7 @@ def test_SwitchActor():
         pname = 'true' if val else 'false'
         NaiveScheduler().run_actor(sw)
         assert sw.outports[pname].pop() == token
+        assert not sw._in_condition
 
     for val in (True, False):
         token = random.randint(0, 100)
@@ -153,6 +154,7 @@ def test_SwitchActor():
         pname = 'true' if val else 'false'
         NaiveScheduler().run_actor(sw)
         assert sw.outports[pname].pop() == token
+        assert not sw._in_condition
 
 
 def test_Shellrunner():

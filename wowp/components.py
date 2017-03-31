@@ -128,8 +128,10 @@ class Component(object):
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
-                warn('Component without any output: {} ({})'.format(
-                    node['ref'].name, node['ref']))
+                if not node['ref'].system_actor:
+                    # system actors can be designed not to have outports, e.g. Sink
+                    warn('Component without any output: {} ({})'.format(
+                        node['ref'].name, node['ref']))
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:

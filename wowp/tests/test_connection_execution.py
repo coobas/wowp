@@ -1,7 +1,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-from wowp.actors import FuncActor
+from wowp.actors import FuncActor, Switch, Sink
 from wowp.schedulers import NaiveScheduler
 import nose
+import random
 
 
 def test_two_connected():
@@ -86,6 +87,35 @@ def test_three_in_line():
     NaiveScheduler().run_actor(actor1)
 
     assert (func(func(func(in_value)))) == actor3.outports['x'].pop()
+
+
+def test_SwitchActorWorkflow():
+
+    for val1 in (True, False):
+        for val2 in (True, False):
+            token = random.randint(0, 100)
+            sw1 = Switch("switch", lambda x: val1)
+            sw2 = Switch("switch", lambda x: val2)
+            pname1 = 'true' if val1 else 'false'
+            sink = Sink()
+            sink.inports.append('inp')
+            if val1:
+                sw2.inports['inp'] += sw1.outports['true']
+                sink.inports['inp'] += sw1.outports['false']
+            else:
+                sw2.inports['inp'] += sw1.outports['false']
+                sink.inports['inp'] += sw1.outports['true']
+
+            pname2 = 'true' if val2 else 'false'
+            wf = sw2.get_workflow()
+            NaiveScheduler().run_workflow(wf, inp=token)
+
+            if val2:
+                assert wf.outports['true'].pop() == token
+                assert wf.outports['false'].isempty()
+            else:
+                assert wf.outports['false'].pop() == token
+                assert wf.outports['true'].isempty()
 
 
 if __name__ == '__main__':

@@ -295,6 +295,8 @@ class Sink(Actor):
     """Dumps everything
     """
 
+    _system_actor = True
+
     def can_run(self):
         return True
 

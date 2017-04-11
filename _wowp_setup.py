@@ -9,7 +9,7 @@ import os
 
 
 def get_version():
-    """Get the version info from the mpld3 package without importing it"""
+    """Get the version info from the package without importing it"""
     with open(os.path.join("wowp", "__about__.py"), "r") as init_file:
         exec(compile(init_file.read(), 'wowp/__about__.py', 'exec'), globals())
     try:

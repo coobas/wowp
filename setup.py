@@ -11,7 +11,7 @@ setup(
     description='Data-flow-actors-based workflow framework',
     long_description=open('README.txt').read(),
     author='Jakub Urban, Jan Pipek',
-    author_email='coobas at gmail dt com',
+    author_email='coobas@gmail.com',
     url='http://pythonic.eu/wowp/',
     install_requires=[
         'decorator',

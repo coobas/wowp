@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-from .util import ListDict, deprecated
+from .util import ListDict, deprecated, abstractmethod
 from collections import deque
 from .logger import logger
 from .schedulers import NaiveScheduler, LinearizedScheduler
@@ -107,8 +107,8 @@ class Component(object):
     # TODO create workflow (composite) from actor's connections
 
     def get_workflow(self, name=None):
-        '''Creates a workflow form actor's connections
-        '''
+        """Creates a workflow form actor's connections
+        """
 
         graph = self.graph
         leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
@@ -283,7 +283,6 @@ class Ports(object):
         return self[key]
 
 
-
 class Port(object):
     """Represents a single input/output actor port
     """
@@ -386,6 +385,10 @@ class Port(object):
         values = self.buffer
         self.buffer = deque()
         return values
+
+    @abstractmethod
+    def put(self, value):
+        pass
 
 
 class OutPort(Port):

@@ -1,5 +1,9 @@
 from __future__ import absolute_import, division, print_function
+
+import itertools
+
 from ..components import Actor
+from ..schedulers import _ActorRunner, ThreadedScheduler
 from future.builtins import super
 
 
@@ -36,6 +40,38 @@ class Concat(Actor):
         self.inports['in_{}'.format(i)].connect(port)
 
 
+class MultiConcat(Actor):
+
+    _system_actor = True
+
+    def __init__(self, name='multiconcat'):
+        super().__init__(name=name)
+        self._port_names = []
+        self._last_connected = -1
+
+    def get_run_args(self):
+        return (), {}
+
+    def run(self, *args, **kwargs):
+        res = {}
+        for inport, outport in zip(self.inports, itertools.cycle(self.outports)):
+            res.setdefault(outport.name, [])
+            res[outport.name].append(inport.pop())
+        return res
+
+    def add_and_connect(self, actor):
+        if self._last_connected > -1:
+            assert self._port_names == [port.name for port in actor.outports]
+        self._last_connected += 1
+        i = self._last_connected
+        for port in actor.outports:
+            self.inports.append('{}_{}'.format(port.name, i))
+            self.inports.at(-1).connect(port)
+            if i == 0:
+                self.outports.append(port.name)
+                self._port_names.append(port.name)
+
+
 class Map(Actor):
     """
     Maps a given actor on input token elements.
@@ -56,14 +92,18 @@ class Map(Actor):
 
     _system_actor = True
 
-    def __init__(self, actor, args=(), kwargs={}, scheduler=None, name='map'):
+    def __init__(self, actor_class, args=(), kwargs={}, scheduler=None, name='map'):
         super().__init__(name=name)
-        self.actor = actor
+        self.actor_class = actor_class
         self.actor_args = args
         self.actor_kwargs = kwargs
         self.map_scheduler = scheduler
-        self.inports.append('inp')
-        self.outports.append('out')
+        # get port names from an actor instance
+        actor = self.actor_class(*self.actor_args, **self.actor_kwargs)
+        for pname in actor.inports.keys():
+            self.inports.append(pname)
+        for pname in actor.outports.keys():
+            self.outports.append(pname)
 
     def get_run_args(self):
         return (), {}
@@ -73,39 +113,38 @@ class Map(Actor):
         # bacause it needs to change the workflow
         if self.map_scheduler is None:
             # self.schduler is set by the calling scheduler
-            map_scheduler = self.scheduler
+            map_scheduler = self.scheduler.copy()
+        elif isinstance(self.map_scheduler, (_ActorRunner, ThreadedScheduler)):
+            # we need a copy of an existing scheduler
+            map_scheduler = self.map_scheduler.copy()
         else:
-            map_scheduler = self.map_scheduler
-        destinations = [port for port in self.outports['out'].connections]
+            # in this case, we assume self.map_scheduler is a class
+            map_scheduler = self.map_scheduler()
+        # destinations = [port for port in self.outports['out'].connections]
         # disconnect the output port
         # for port in destinations:
         #     self.outports['out'].disconnect(port)
         # create the map actors, connect and put inputs
         map_actors = []
-        items = self.inports['inp'].pop()
-        concat_actor = Concat(n_ports=len(items))
-        for i, item in enumerate(items):
-            actor = self.actor(*self.actor_args, **self.actor_kwargs)
-            if not map_actors:
-                # the first item - do some extra work
-                assert len(actor.inports) == 1
-                assert len(actor.outports) == 1
-                inport_name = actor.inports.keys()[0]
-                outport_name = actor.outports.keys()[0]
+        concat_actor = MultiConcat()
+        # items will iterate over all ports inputs, i.e. will contain n-th actor input
+        # TODO ensure equal input lengths
+        for items in zip(*(port.pop() for port in self.inports)):
+            # get actor instance
+            actor = self.actor_class(*self.actor_args, **self.actor_kwargs)
             map_actors.append(actor)
-            # append to concatenate actor
-            concat_actor.connect_input(actor.outports[outport_name])
+            concat_actor.add_and_connect(actor)
             # put the input data item
-            map_scheduler.put_value(actor.inports[inport_name], item)
-            # actor.inports[inport_name].put(item)
+            for port, value in zip(actor.inports, items):
+                # value is a single input item of the port
+                map_scheduler.put_value(port, value)
         # run the mapping sub-workflows
         # map_workflow = concat_actor.get_workflow()
         # result = map_scheduler.run_workflow(map_workflow)
         map_scheduler.execute()
-        # result = (actor.outports[outport_name].pop() for actor in map_actors)
-        result = concat_actor.outports['out'].pop()
 
-        return {'out': result}
+        result = {port.name: port.pop() for port in concat_actor.outports}
+        return result
 
 
 class PassWID(Actor):

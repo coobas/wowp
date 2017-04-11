@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-from wowp.actors import FuncActor, Switch
+from wowp.actors import FuncActor, Switch, LoopWhile
 from wowp.schedulers import LinearizedScheduler, ThreadedScheduler
 import nose
 
@@ -15,15 +15,15 @@ def test_LinearizedScheduler_loop1000():
     scheduler = LinearizedScheduler()
 
     fa = FuncActor(func, outports=('x', ))
-    lw = Switch("a_loop", condition)
+    lw = LoopWhile("a_loop", condition)
 
-    fa.inports['x'] += lw.outports['loop_out']
-    lw.inports['loop_in'] += fa.outports['x']
+    fa.inports['x'] += lw.outports['loop']
+    lw.inports['loop'] += fa.outports['x']
 
-    scheduler.put_value(lw.inports['loop_in'], 0)
+    scheduler.put_value(lw.inports['init'], 0)
     scheduler.execute()
 
-    result = lw.outports['final'].pop()
+    result = lw.outports['exit'].pop()
     assert (result == 1000)
 
 

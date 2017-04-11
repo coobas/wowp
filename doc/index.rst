@@ -32,7 +32,7 @@ The source code is available from  `Bitbucket <http://bitbucket.org/urbanj/wowp>
 Prerequisites
 -------------
 
-* Python 3.4+ (3.3 not tested, 2.7 is not supported at the moment)
+* Python 3.4+ (recommended) or 2.7
 
 Optional:
 

@@ -14,6 +14,23 @@ try:
         from thread import get_ident as _get_ident
 except ImportError:
     from dummy_threading import get_ident as _get_ident
+# import a pickling module
+import pickle
+my_pickle = pickle
+# try dill
+try:
+    import dill
+    _IS_DILL = True
+    my_pickle = dill
+except ImportError:
+    _IS_DILL = False
+# cludpickle is default
+try:
+    import cloudpickle
+    _IS_CLOUDPICKLE = True
+    my_pickle = cloudpickle
+except ImportError:
+    _IS_CLOUDPICKLE = False
 
 
 class ListDict(_OrderedDict):
@@ -165,3 +182,43 @@ class TemporaryDirectory(object):
             self._rmdir(path)
         except OSError:
             pass
+
+
+def enum(*sequential, **named):
+    """Handy way to fake an enumerated type in Python
+    http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type(str('Enum'), (), enums)
+
+
+MPI_TAGS = enum('READY', 'DONE', 'EXIT', 'START')
+
+
+def dumps(obj):
+    return my_pickle.dumps(obj)
+
+
+def loads(obj):
+    return my_pickle.loads(obj)
+
+
+def dump(obj, file):
+    if isinstance(file, six.string_types):
+        file = open(file, 'wb')
+    return my_pickle.dump(obj, file)
+
+
+def load(file):
+    if isinstance(file, six.string_types):
+        file = open(file, 'rb')
+    return my_pickle.load(file)
+
+
+def abstractmethod(method):
+    def default_abstract_method(*args, **kwargs):
+        raise NotImplementedError('call to abstract method ' + repr(method))
+
+    default_abstract_method.__name__ = method.__name__
+
+    return default_abstract_method

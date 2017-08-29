@@ -21,7 +21,7 @@ try:
 except ImportError:
     import mock
 
-MOCK_MODULES = []
+MOCK_MODULES = ['julia']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
@@ -73,7 +73,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'wowp'
-copyright = '2015-16, Jakub Urban, Jan Pipek'
+copyright = '2015-17, Jakub Urban, Jan Pipek'
 import wowp
 
 # The version info for the project you're documenting, acts as replacement for

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 from _wowp_setup import get_version
+import os
 
 setup(
     name='wowp',
@@ -9,7 +10,7 @@ setup(
     scripts=['scripts/wowp', 'scripts/wowp_on_slurm'],
     license='MIT',
     description='Data-flow-actors-based workflow framework',
-    long_description=open('README.txt').read(),
+    long_description=open(os.path.join(os.path.dirname(__file__), 'README.txt')).read(),
     author='Jakub Urban, Jan Pipek',
     author_email='coobas@gmail.com',
     url='http://pythonic.eu/wowp/',

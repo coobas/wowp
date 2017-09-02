@@ -41,21 +41,23 @@ class Component(object):
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def get_run_args(self):
+    def get_run_args(self, check_connected=False):
         """
         Prepare arguments (args, kwargs) for the run method
 
         The default behaviour is to put values from
         all connected input ports to kwargs.
 
+        :param check_connected: include only connected ports
         :return: args, kwargs
         :rtype: tuple
         """
         args = ()
-        kwargs = {
-            port.name: port.pop()
-            for port in self.inports if port.isconnected()
-            }
+        if check_connected:
+            ports = (port for port in self.inports if port.isconnected())
+        else:
+            ports = self.inports
+        kwargs = {port.name: port.pop() for port in ports}
         return args, kwargs
 
     @classmethod
@@ -145,7 +147,7 @@ class Actor(Component):
     """Actor class
     """
 
-    def __call__(self, **kwargs):
+    def __call__(self, *args, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
 
@@ -158,7 +160,7 @@ class Actor(Component):
             if inport.name in kwargs:
                 inport.buffer.appendleft(kwargs[inport.name])
         # run the actor
-        args, kwargs = self.get_run_args()
+        args, kwargs = self.get_run_args(check_connected=False)
         res = self.run(*args, **kwargs)
         return res
 
@@ -495,7 +497,7 @@ def build_nx_graph(actor):
                 if not port.connections:
                     # terminal node
                     attrs["style"] = "filled"
-                    attrs["color"] = "#ffffff"
+                    attrs["color"] = "#ADFF2F"
                 else:
                     attrs["color"] = "#9ed8f5"
                 graph.add_node(_get_name(port), type='port', ref=port,
@@ -520,6 +522,8 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
         kwargs.update(pos_kwargs)
     if layout == 'spectral':
         lfunc = functools.partial(nx.spectral_layout, **kwargs)
+    elif layout == 'spring':
+        lfunc = functools.partial(nx.spring_layout, **kwargs)
     else:
         raise ValueError('{} layout not supported'.format(layout))
     # get colors and labels

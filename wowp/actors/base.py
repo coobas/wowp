@@ -4,7 +4,8 @@ import inspect
 import itertools
 import six
 
-__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge', 'LoopWhile']
+__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink',
+           'DictionaryMerge', 'DictionaryExtract', 'LoopWhile']
 
 
 class FuncActor(Actor):
@@ -316,23 +317,70 @@ class DictionaryMerge(Actor):
     The keys of the dictionary will be equal to inport names.
     """
 
-    def __init__(self, name="packager", inport_names=("in"), outport_name="out"):
+    def __init__(self, name="packager", inport_names=("in"), outport_name="out", basedict=False):
         super(DictionaryMerge, self).__init__(name=name)
         for in_name in inport_names:
             self.inports.append(in_name)
+        if basedict:
+            if 'basedict' in inport_names:
+                raise ValueError("'basedict' is a reserved input port name")
+            self.inports.append('basedict')
+        self.basedict = basedict
         self.outport_name = outport_name
         self.outports.append(outport_name)
 
     def get_run_args(self):
-        return (), {
+        res = (), {
             "values": {port.name: port.pop()
                        for port in self.inports},
-            "outport_name": self.outport_name
+            "outport_name": self.outport_name,
+            "basedict": self.basedict
+        }
+        return res
+
+    @staticmethod
+    def run(*args, **kwargs):
+        if kwargs['basedict']:
+            res = kwargs.get("values").pop('basedict')
+        else:
+            res = {}
+        res.update(kwargs.get("values"))
+        return {kwargs['outport_name']: res}
+
+
+class DictionaryExtract(Actor):
+    """Extract fields from the input dictionary.
+
+    outport names specify the extracted keys.
+    """
+
+    def __init__(self, name="splitter", outport_names=(), inport_name="inp", feedthrough=True):
+        super(DictionaryExtract, self).__init__(name=name)
+        for out_name in outport_names:
+            self.outports.append(out_name)
+        self.output_keys = tuple(self.outports.keys())
+        if feedthrough:
+            if "feedthrough" is self.output_keys:
+                raise ValueError("feedthrough is a reserved output port name")
+            self.outports.append("feedthrough")
+        self.inport_name = inport_name
+        self.inports.append(inport_name)
+        self.feedthrough = feedthrough
+
+    def get_run_args(self):
+        return (), {
+            "inp": self.inports[self.inport_name].pop(),
+            "output_keys": self.output_keys,
+            "feedthrough": self.feedthrough
         }
 
     @staticmethod
     def run(*args, **kwargs):
-        return {kwargs.get("outport_name"): kwargs.get("values")}
+        input_dict = kwargs.get("inp")
+        res = {key: input_dict[key] for key in kwargs['output_keys']}
+        if kwargs["feedthrough"]:
+            res["feedthrough"] = input_dict
+        return res
 
 
 class LoopWhile(Actor):

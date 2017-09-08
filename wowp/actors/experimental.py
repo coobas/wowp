@@ -50,6 +50,9 @@ class IteratorActor(GeneratorActor):
 
 
 class Splitter(Actor):
+
+    _system_actor = True
+
     def __init__(self, name="splitter", inport_name="in", multiplicity=2):
         import itertools
         Actor.__init__(self, name=name)
@@ -62,8 +65,8 @@ class Splitter(Actor):
 
         self._outports_cycle = itertools.cycle(range(1, multiplicity + 1))
 
-    def run(self):
-        value = self.inports[self.inport_name].pop()
+    def run(self, *args, **kwargs):
+        value = kwargs[self.inport_name]
         i = next(self._outports_cycle)
         outport = "%s_%d" % (self.inport_name, i)
         return {outport: value}

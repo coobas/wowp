@@ -399,12 +399,10 @@ class LoopWhile(Actor):
         self.inports.append('loop')
         self.outports.append('loop')
         self.outports.append('exit')
-        # TODO: we could possibly create condition ports only if condition_func is None
-        # --> would have to fix the logic in run
-        self.outports.append('condition_in')
-        self.inports.append('condition_out')
         if condition_func is None:
             self._condition_func = None
+            self.outports.append('condition_in')
+            self.inports.append('condition_out')
         elif callable(condition_func):
             self._condition_func = condition_func
         else:
@@ -417,7 +415,9 @@ class LoopWhile(Actor):
     def is_condition_actor(self):
         """Returns True if condition actor is connected
         """
-        if (self.inports['condition_out'].isconnected() and
+        if self._condition_func is not None:
+            return False
+        elif (self.inports['condition_out'].isconnected() and
                 self.outports['condition_in'].isconnected()):
             return True
         elif (self.inports['condition_out'].isconnected() or
@@ -435,6 +435,8 @@ class LoopWhile(Actor):
         elif not self.inports['loop'].isempty():
             # input value from the loop
             value = self.inports['loop'].pop()
+        elif self._condition_func is not None:
+            condition_out = False
         elif not self.inports['condition_out'].isempty():
             # we receive the condition actor output
             # the value was stored
@@ -463,8 +465,11 @@ class LoopWhile(Actor):
     def can_run(self):
         if self._in_loop:
             # waiting for loop
-            res = (not self.inports['loop'].isempty() or
-                   not self.inports['condition_out'].isempty())
+            if self.is_condition_actor():
+                res = (not self.inports['loop'].isempty() or
+                       not self.inports['condition_out'].isempty())
+            else:
+                res = not self.inports['loop'].isempty()
         else:
             res = not self.inports['init'].isempty()
         return res

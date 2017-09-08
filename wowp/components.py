@@ -53,6 +53,7 @@ class Component(object):
         :rtype: tuple
         """
         args = ()
+        # TODO shouldn't we disable check_connected totally?
         if check_connected:
             ports = (port for port in self.inports if port.isconnected())
         else:
@@ -160,7 +161,7 @@ class Actor(Component):
             if inport.name in kwargs:
                 inport.buffer.appendleft(kwargs[inport.name])
         # run the actor
-        args, kwargs = self.get_run_args(check_connected=False)
+        args, kwargs = self.get_run_args()
         res = self.run(*args, **kwargs)
         return res
 

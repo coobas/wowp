@@ -590,7 +590,8 @@ class FuturesScheduler(_ActorRunner):
         self.running_actors = {}
         self.execution_queue = deque()
         self.wait_queue = []
-        self.last_sleep = 0
+        # will be used as the initial sleep time between polls
+        self.last_sleep = 1e-3
 
     def run_actor(self, actor):
         # print("Run actor {}".format(actor))
@@ -625,13 +626,10 @@ class FuturesScheduler(_ActorRunner):
 
             # TODO fix against spamming engines - PROBABLY NOT THE BEST WAY!
             if self.nothing:
-                # increase sleep time if nothing is happening
-                self.last_sleep = min(1, max(0.001, self.last_sleep * 2))
-                logger.debug('scheduler sleeps for {} ms'.format(
-                    self.last_sleep * 1e3))
+                # use constant sleep time
+                logger.debug('scheduler sleeps for {} s'.format(
+                    self.last_sleep))
                 time.sleep(self.last_sleep)
-            else:
-                self.last_sleep = 0
 
                 # TODO could we use callbacks?
 

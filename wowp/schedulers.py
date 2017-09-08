@@ -361,6 +361,14 @@ class IpyparallelExecutor(object):
             self._ipy_rc.append(self.init_cluster(min_engines, timeout, **
                                                   kwargs))
             self._ipy_dv.append(self._ipy_rc[-1][:])
+            # Use dill / cloudpickle by default
+            try:
+                self._ipy_dv[-1].use_dill()
+            except Exception:
+                try:
+                    self._ipy_dv[-1].use_cloudpickle()
+                except Exception as e:
+                    logger.warn('Nor dill not cloudpickle can be used for ipyparallel')
             self._ipy_lv.append(self._ipy_rc[-1].load_balanced_view())
 
         self.running_actors = {}

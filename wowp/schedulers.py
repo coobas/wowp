@@ -439,7 +439,7 @@ class FutureJob(object):
     def __getattr__(self, item):
         return getattr(self._future, item)
 
-    def display_outpus(self):
+    def display_outputs(self):
         # TODO how to display outputs?
         pass
 

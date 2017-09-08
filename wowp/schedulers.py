@@ -14,15 +14,23 @@ import os
 import random
 
 try:
-    from ipyparallel import Client, RemoteError
+    import ipyparallel
 except ImportError:
     warnings.warn(
-        'ipyparallel not installed: IPyClusterScheduler cannot be used')
+        'ipyparallel not installed: FuturesScheduler cannot use ipyparallel executor')
+    ipyparallel = None
+try:
+    import distributed
+except ImportError:
+    warnings.warn(
+        'distributed not installed: FuturesScheduler cannot use distributed executor')
+    distributed = None
 try:
     from mpi4py import MPI
 except ImportError:
     warnings.warn(
         'mpi4py not installed: mpi4py cannot be used')
+    MPI = None
 from .util import MPI_TAGS, loads, dumps
 import itertools
 
@@ -32,6 +40,7 @@ __all__ = [
     "LinearizedScheduler",
     "ThreadedScheduler",
     "FuturesScheduler"]
+
 
 class _ActorRunner(object):
     """Base class for objects that run actors and process their results.
@@ -388,7 +397,7 @@ class IpyparallelExecutor(object):
 
         while True:
             try:
-                cli = Client(*args, **kwargs)
+                cli = ipyparallel.Client(*args, **kwargs)
             except Exception as e:
                 if time.time() > maxtime:
                     # raise the original exception from ipyparallel
@@ -423,7 +432,8 @@ class IpyparallelExecutor(object):
         """Submit a function: func(*args, **kwargs) and return a FutureJob.
         """
 
-        # print("Run actor {}".format(actor))
+        # This switches ipyparallel clients (ie clusters)
+        # TODO this is likely not good - data will have to travel too much
         lv = self._ipy_lv[self._rotate_client()]
         job = lv.apply_async(func, *args, **kwargs)
         return FutureIpyJob(job)
@@ -569,22 +579,22 @@ class FuturesScheduler(_ActorRunner):
         if copy_from is None:
             if executor == 'multiprocessing':
                 self.executor = MultiprocessingExecutor(processes=min_engines)
-            elif executor == 'distributed':
+            elif distributed is not None and executor == 'distributed':
                 self.executor = DistributedExecutor(uris=executor_kwargs['uris'],
                                                     min_engines=min_engines,
                                                     timeout=timeout)
-            elif executor == 'ipyparallel':
+            elif ipyparallel is not None and executor == 'ipyparallel':
                 kwargs = dict(min_engines=min_engines,
                               timeout=timeout,
                               display_outputs=display_outputs)
                 kwargs.update(executor_kwargs)
                 self.executor = IpyparallelExecutor(**kwargs)
-            elif executor == 'mpi':
+            elif MPI is not None and executor == 'mpi':
                 self.executor = MPIExecutor()
             # elif executor == 'scoop':
             #     self.executor = ScoopExecutor()
             else:
-                raise ValueError('Executor {} unknown'.format(executor))
+                raise ValueError('Executor {} not supported'.format(executor))
             self.system_executor = LocalExecutor()
         else:
             # executors must be shared across copies to avoid their initialization
@@ -613,8 +623,8 @@ class FuturesScheduler(_ActorRunner):
         else:
             res['job'] = self.executor.submit(actor.run, *args, **kwargs)
 
-        logger.debug('submitted actor {}({}, {})'.format(actor.name, args,
-                                                         kwargs))
+        logger.debug('submitted actor {}, len(args)={}, kwargs keys={}'.format(
+            actor.name, len(args), list(kwargs.keys())))
 
         return res
 

@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .util import ListDict, deprecated, abstractmethod
 from collections import deque
 from .logger import logger
-from .schedulers import NaiveScheduler, LinearizedScheduler
+from .schedulers import LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
@@ -126,8 +126,7 @@ class Component(object):
             elif isinstance(node['ref'], InPort):
                 workflow.add_inport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref'
-                                                                    ]))
+                raise Exception('{} cannot be an input port'.format(node['ref']))
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
@@ -138,8 +137,7 @@ class Component(object):
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an output port'.format(node['ref'
-                                                                    ]))
+                raise Exception('{} cannot be an output port'.format(node['ref']))
 
         return workflow
 
@@ -573,7 +571,6 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
     # get colors and labels
     colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()
               ]
-    shapes = [graph.node[n].get('shape', 'o') for n in graph.nodes_iter()]
     labels = {n: graph.node[n].get('label', '') for n in graph.nodes_iter()}
     pos = lfunc(graph)
     nx.draw_networkx(graph,

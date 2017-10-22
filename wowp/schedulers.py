@@ -814,6 +814,22 @@ class ThreadedScheduler(object):
             # print("Join thread")
             thread.join()
 
+    def run_workflow(self, workflow, **kwargs):
+        inport_names = tuple(port.name for port in workflow.inports)
+        if workflow.scheduler is not None:
+            # TODO this seems a bit strange
+            scheduler = workflow.scheduler
+        else:
+            scheduler = self
+        for key, value in kwargs.items():
+            if key not in inport_names:
+                raise ValueError('{} is not an inport name'.format(key))
+            inport = workflow.inports[key]
+            # put values to connected ports
+            scheduler.put_value(inport, kwargs[inport.name])
+        # TODO can this be run inside self.execute itsef?
+        scheduler.execute()
+
     def finish_all_threads(self):
         # print("Everything finished. Waiting for threads to end.")
         for thread in self.threads:

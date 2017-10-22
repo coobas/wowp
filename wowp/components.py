@@ -427,9 +427,9 @@ class InPort(Port):
 
 
 class FrozenInPort(InPort):
-    """A single, named input port
+    """A single, named input port with frozen first input
 
-    persistent (bool): wait for the first input, then yields this value
+    This port has to receive the input value exactly once.
     """
 
     def __init__(self, name, owner, value=NoValue):

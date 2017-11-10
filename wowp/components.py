@@ -111,8 +111,12 @@ class Component(object):
         """
 
         graph = self.graph
-        leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
-        leaves_in = [n for n, d in graph.in_degree_iter() if d == 0]
+        if hasattr(graph, "out_degree_iter"):    # Old networkx
+            leaves_out = [n for n, d in graph.out_degree_iter() if d == 0]
+            leaves_in = [n for n, d in graph.in_degree_iter() if d == 0]
+        else:
+            leaves_out = [n for n, d in graph.out_degree if d == 0]
+            leaves_in = [n for n, d in graph.in_degree if d == 0]
 
         workflow = Workflow(name=name)
 

@@ -526,11 +526,19 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
         lfunc = functools.partial(nx.spectral_layout, **kwargs)
     else:
         raise ValueError('{} layout not supported'.format(layout))
+
+    # Deal with networkx API change
+    if hasattr(graph, "nodes_iter"):
+        # This will be deprecated
+        node_iterator = lambda x: x.nodes_iter()
+    else:
+        node_iterator = lambda x: x.nodes
+
     # get colors and labels
-    colors = [graph.node[n].get('color', '#ffffff') for n in graph.nodes_iter()
+    colors = [graph.node[n].get('color', '#ffffff') for n in node_iterator(graph)
               ]
-    shapes = [graph.node[n].get('shape', 'o') for n in graph.nodes_iter()]
-    labels = {n: graph.node[n].get('label', '') for n in graph.nodes_iter()}
+    shapes = [graph.node[n].get('shape', 'o') for n in node_iterator(graph)]
+    labels = {n: graph.node[n].get('label', '') for n in node_iterator(graph)}
     pos = lfunc(graph)
     nx.draw_networkx(graph,
                      pos=pos,

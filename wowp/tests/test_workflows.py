@@ -50,6 +50,7 @@ def _test_workflow_chain(scheduler, wf_scheduler):
     from wowp.actors.mapreduce import PassWID
     import math
     import random
+    import six
 
     sin = FuncActor(math.sin)
     asin = FuncActor(math.asin)
@@ -74,7 +75,10 @@ def _test_workflow_chain(scheduler, wf_scheduler):
     # wf2 has output
     assert res2
     assert len(res2) == 1
-    assert math.isclose(res2[0]['inp'], inp)
+    if six.PY3:
+        assert math.isclose(res2[0]['inp'], inp)
+    else:
+        assert math.fabs(res2[0]['inp'] - inp) < 1e-10
 
 
 def test_all_schedulers():

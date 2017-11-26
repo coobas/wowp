@@ -3,6 +3,8 @@ from ..components import Actor
 import inspect
 import itertools
 import six
+import collections
+from ..logger import logger
 
 __all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink',
            'DictionaryMerge', 'DictionaryExtract', 'LoopWhile']
@@ -46,7 +48,18 @@ class FuncActor(Actor):
                         if par.name not in kwargs)
                 if outports is None and return_annotation is not inspect.Signature.empty:
                     # if func has a return annotation, use it for outports names
-                    outports = return_annotation
+                    if not isinstance(return_annotation, collections.Sequence):
+                        logger.debug('annotation ignored - not a sequence')
+                    else:
+                        outports = []
+                        for port in return_annotation:
+                            # we only allow string annotations
+                            if not isinstance(port, six.string_types):
+                                logger.debug('only strings are understood by wowp '
+                                             'in output annotations')
+                                outports = None
+                                break
+                            outports.append(port)
         except (ValueError, TypeError):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports

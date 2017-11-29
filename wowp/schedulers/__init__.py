@@ -9,7 +9,7 @@ import time
 import datetime
 import six
 import traceback
-from .logger import logger
+from ..logger import logger
 import os
 import random
 
@@ -31,7 +31,7 @@ except ImportError:
     warnings.warn(
         'mpi4py not installed: mpi4py cannot be used')
     MPI = None
-from .util import MPI_TAGS, loads, dumps
+from ..util import MPI_TAGS, loads, dumps
 import itertools
 
 
@@ -113,9 +113,9 @@ class _ActorRunner(object):
     def shutdown(self):
         pass
 
-    # def __del__(self):
-    #     self.shutdown()
-    #     super(_ActorRunner, self).__del__()
+        # def __del__(self):
+        #     self.shutdown()
+        #     super(_ActorRunner, self).__del__()
 
 
 class NaiveScheduler(_ActorRunner):
@@ -368,7 +368,7 @@ class IpyparallelExecutor(object):
                 kwargs.update(client_kwargs)
             # TODO min_engines divide by len(profile_dirs)
             self._ipy_rc.append(self.init_cluster(min_engines, timeout, **
-                                                  kwargs))
+            kwargs))
             self._ipy_dv.append(self._ipy_rc[-1][:])
             # Use dill / cloudpickle by default
             try:
@@ -619,7 +619,7 @@ class FuturesScheduler(_ActorRunner):
         res = dict(args=args, kwargs=kwargs)
         if actor.system_actor:
             res['job'] = self.system_executor.submit(actor.run, *args, **
-                                                     kwargs)
+            kwargs)
         else:
             res['job'] = self.executor.submit(actor.run, *args, **kwargs)
 

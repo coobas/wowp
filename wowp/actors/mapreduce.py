@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function
 import itertools
 
 from ..components import Actor
-from ..schedulers import _ActorRunner, ThreadedScheduler
+from ..schedulers import ActorRunner, ThreadedScheduler
 from future.builtins import super
 
 
@@ -114,7 +114,7 @@ class Map(Actor):
         if self.map_scheduler is None:
             # self.schduler is set by the calling scheduler
             map_scheduler = self.scheduler.copy()
-        elif isinstance(self.map_scheduler, (_ActorRunner, ThreadedScheduler)):
+        elif isinstance(self.map_scheduler, (ActorRunner, ThreadedScheduler)):
             # we need a copy of an existing scheduler
             map_scheduler = self.map_scheduler.copy()
         else:

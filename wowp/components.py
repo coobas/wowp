@@ -2,7 +2,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .util import ListDict, deprecated, abstractmethod
 from collections import deque
 from .logger import logger
-from .schedulers import LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
@@ -197,6 +196,7 @@ class Composite(Component):
             scheduler = self.scheduler
         if scheduler is None:
             # default scheduler for __call__
+            from .schedulers import LinearizedScheduler
             scheduler = LinearizedScheduler()
 
         scheduler.run_workflow(self, **kwargs)

@@ -74,18 +74,3 @@ class ActorRunner(object):
 
     def shutdown(self):
         pass
-
-
-class FutureJob(object):
-    """An asynchronous job with Future-like API
-    """
-
-    def __init__(self, future):
-        self._future = future
-
-    def __getattr__(self, item):
-        return getattr(self._future, item)
-
-    def display_outputs(self):
-        # TODO how to display outputs?
-        pass

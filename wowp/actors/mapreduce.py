@@ -3,7 +3,8 @@ from __future__ import absolute_import, division, print_function
 import itertools
 
 from ..components import Actor
-from ..schedulers import ActorRunner, ThreadedScheduler
+from ..schedulers import ThreadedScheduler
+from ..schedulers.shared import ActorRunner
 from future.builtins import super
 
 

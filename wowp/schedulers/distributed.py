@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import six
 from distributed import Executor
 
-from .shared import FutureJob
+from .futures import FutureJob
 
 
 class DistributedExecutor(object):

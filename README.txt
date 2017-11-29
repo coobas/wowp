@@ -35,6 +35,7 @@ Using pypi (may be outdated)
 .. code:: bash
 
     pip install wowp
+    # or pip install wowp[all] to include also optional dependencies.
 
 Dependencies
 ++++++++++++

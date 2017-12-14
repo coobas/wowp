@@ -3,8 +3,11 @@ from ..components import Actor
 import inspect
 import itertools
 import six
+import collections
+from ..logger import logger
 
-__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink', 'DictionaryMerge', 'LoopWhile']
+__all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink',
+           'DictionaryMerge', 'DictionaryExtract', 'LoopWhile']
 
 
 class FuncActor(Actor):
@@ -45,7 +48,18 @@ class FuncActor(Actor):
                         if par.name not in kwargs)
                 if outports is None and return_annotation is not inspect.Signature.empty:
                     # if func has a return annotation, use it for outports names
-                    outports = return_annotation
+                    if not isinstance(return_annotation, collections.Sequence):
+                        logger.debug('annotation ignored - not a sequence')
+                    else:
+                        outports = []
+                        for port in return_annotation:
+                            # we only allow string annotations
+                            if not isinstance(port, six.string_types):
+                                logger.debug('only strings are understood by wowp '
+                                             'in output annotations')
+                                outports = None
+                                break
+                            outports.append(port)
         except (ValueError, TypeError):
             # e.g. numpy has no support for inspect.signature
             # --> using manual inports
@@ -316,23 +330,70 @@ class DictionaryMerge(Actor):
     The keys of the dictionary will be equal to inport names.
     """
 
-    def __init__(self, name="packager", inport_names=("in"), outport_name="out"):
+    def __init__(self, name="packager", inport_names=("in"), outport_name="out", basedict=False):
         super(DictionaryMerge, self).__init__(name=name)
         for in_name in inport_names:
             self.inports.append(in_name)
+        if basedict:
+            if 'basedict' in inport_names:
+                raise ValueError("'basedict' is a reserved input port name")
+            self.inports.append('basedict')
+        self.basedict = basedict
         self.outport_name = outport_name
         self.outports.append(outport_name)
 
     def get_run_args(self):
-        return (), {
+        res = (), {
             "values": {port.name: port.pop()
                        for port in self.inports},
-            "outport_name": self.outport_name
+            "outport_name": self.outport_name,
+            "basedict": self.basedict
+        }
+        return res
+
+    @staticmethod
+    def run(*args, **kwargs):
+        if kwargs['basedict']:
+            res = kwargs.get("values").pop('basedict')
+        else:
+            res = {}
+        res.update(kwargs.get("values"))
+        return {kwargs['outport_name']: res}
+
+
+class DictionaryExtract(Actor):
+    """Extract fields from the input dictionary.
+
+    outport names specify the extracted keys.
+    """
+
+    def __init__(self, name="splitter", outport_names=(), inport_name="inp", feedthrough=True):
+        super(DictionaryExtract, self).__init__(name=name)
+        for out_name in outport_names:
+            self.outports.append(out_name)
+        self.output_keys = tuple(self.outports.keys())
+        if feedthrough:
+            if "feedthrough" is self.output_keys:
+                raise ValueError("feedthrough is a reserved output port name")
+            self.outports.append("feedthrough")
+        self.inport_name = inport_name
+        self.inports.append(inport_name)
+        self.feedthrough = feedthrough
+
+    def get_run_args(self):
+        return (), {
+            "inp": self.inports[self.inport_name].pop(),
+            "output_keys": self.output_keys,
+            "feedthrough": self.feedthrough
         }
 
     @staticmethod
     def run(*args, **kwargs):
-        return {kwargs.get("outport_name"): kwargs.get("values")}
+        input_dict = kwargs.get("inp")
+        res = {key: input_dict[key] for key in kwargs['output_keys']}
+        if kwargs["feedthrough"]:
+            res["feedthrough"] = input_dict
+        return res
 
 
 class LoopWhile(Actor):
@@ -351,12 +412,10 @@ class LoopWhile(Actor):
         self.inports.append('loop')
         self.outports.append('loop')
         self.outports.append('exit')
-        # TODO: we could possibly create condition ports only if condition_func is None
-        # --> would have to fix the logic in run
-        self.outports.append('condition_in')
-        self.inports.append('condition_out')
         if condition_func is None:
             self._condition_func = None
+            self.outports.append('condition_in')
+            self.inports.append('condition_out')
         elif callable(condition_func):
             self._condition_func = condition_func
         else:
@@ -369,7 +428,9 @@ class LoopWhile(Actor):
     def is_condition_actor(self):
         """Returns True if condition actor is connected
         """
-        if (self.inports['condition_out'].isconnected() and
+        if self._condition_func is not None:
+            return False
+        elif (self.inports['condition_out'].isconnected() and
                 self.outports['condition_in'].isconnected()):
             return True
         elif (self.inports['condition_out'].isconnected() or
@@ -387,6 +448,8 @@ class LoopWhile(Actor):
         elif not self.inports['loop'].isempty():
             # input value from the loop
             value = self.inports['loop'].pop()
+        elif self._condition_func is not None:
+            condition_out = False
         elif not self.inports['condition_out'].isempty():
             # we receive the condition actor output
             # the value was stored
@@ -415,8 +478,11 @@ class LoopWhile(Actor):
     def can_run(self):
         if self._in_loop:
             # waiting for loop
-            res = (not self.inports['loop'].isempty() or
-                   not self.inports['condition_out'].isempty())
+            if self.is_condition_actor():
+                res = (not self.inports['loop'].isempty() or
+                       not self.inports['condition_out'].isempty())
+            else:
+                res = not self.inports['loop'].isempty()
         else:
             res = not self.inports['init'].isempty()
         return res

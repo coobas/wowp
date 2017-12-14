@@ -1,6 +1,5 @@
-# backward compatibility for actors.experimental - remove when not needed
 from __future__ import absolute_import, division, print_function, unicode_literals
-from wowp.actors.experimental import Splitter, Chain
+from wowp.actors.special import Splitter, Chain
 from wowp.schedulers import NaiveScheduler
 from wowp.actors import FuncActor
 from wowp.util import ConstructorWrapper

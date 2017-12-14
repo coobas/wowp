@@ -45,6 +45,42 @@ def _call_workflow(scheduler, wf_scheduler):
     assert res['out'].pop() == math.asin(math.sin(x))
 
 
+def _test_workflow_chain(scheduler, wf_scheduler):
+    from wowp.actors import FuncActor
+    from wowp.actors.mapreduce import PassWID
+    import math
+    import random
+    import six
+
+    sin = FuncActor(math.sin)
+    asin = FuncActor(math.asin)
+    # first workflow
+    asin.inports['inp'] += sin.outports['out']
+    wf1 = sin.get_workflow()
+    # second workflow
+    passwid = PassWID()
+    wf2 = passwid.get_workflow()
+    # connect the two workflows
+    wf2.inports['inp'] += wf1.outports['out']
+
+    wf1.scheduler = wf_scheduler
+    wf2.scheduler = wf_scheduler
+
+    inp = random.random()
+    scheduler.run_workflow(wf1, inp=inp)
+    res1 = wf1.outports['out'].pop_all()
+    res2 = wf2.outports['out'].pop_all()
+    # wf1 wmpty output
+    assert not res1
+    # wf2 has output
+    assert res2
+    assert len(res2) == 1
+    if six.PY3:
+        assert math.isclose(res2[0]['inp'], inp)
+    else:
+        assert math.fabs(res2[0]['inp'] - inp) < 1e-10
+
+
 def test_all_schedulers():
     for scheduler in (ThreadedScheduler(max_threads=8),
                       LinearizedScheduler(),
@@ -53,5 +89,6 @@ def test_all_schedulers():
                              LinearizedScheduler(),
                              NaiveScheduler()):
             for case in (_call_workflow,
-                         _run_workflow):
+                         _run_workflow,
+                         _test_workflow_chain):
                 yield case, scheduler, wf_scheduler

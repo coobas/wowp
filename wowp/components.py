@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .util import ListDict, deprecated, abstractmethod
 from collections import deque
 from .logger import logger
-from .schedulers import NaiveScheduler, LinearizedScheduler
+from .schedulers import LinearizedScheduler
 import networkx as nx
 import functools
 import keyword
@@ -41,21 +41,24 @@ class Component(object):
         self._inports = Ports(InPort, self)
         self._outports = Ports(OutPort, self)
 
-    def get_run_args(self):
+    def get_run_args(self, check_connected=False):
         """
         Prepare arguments (args, kwargs) for the run method
 
         The default behaviour is to put values from
         all connected input ports to kwargs.
 
+        :param check_connected: include only connected ports
         :return: args, kwargs
         :rtype: tuple
         """
         args = ()
-        kwargs = {
-            port.name: port.pop()
-            for port in self.inports if port.isconnected()
-            }
+        # TODO shouldn't we disable check_connected totally?
+        if check_connected:
+            ports = (port for port in self.inports if port.isconnected())
+        else:
+            ports = self.inports
+        kwargs = {port.name: port.pop() for port in ports}
         return args, kwargs
 
     @classmethod
@@ -127,8 +130,7 @@ class Component(object):
             elif isinstance(node['ref'], InPort):
                 workflow.add_inport(node['ref'])
             else:
-                raise Exception('{} cannot be an input port'.format(node['ref'
-                                                                    ]))
+                raise Exception('{} cannot be an input port'.format(node['ref']))
 
         for node in (graph.node[n] for n in leaves_out):
             if isinstance(node['ref'], Component):
@@ -139,8 +141,7 @@ class Component(object):
             elif isinstance(node['ref'], OutPort):
                 workflow.add_outport(node['ref'])
             else:
-                raise Exception('{} cannot be an output port'.format(node['ref'
-                                                                    ]))
+                raise Exception('{} cannot be an output port'.format(node['ref']))
 
         return workflow
 
@@ -149,7 +150,7 @@ class Actor(Component):
     """Actor class
     """
 
-    def __call__(self, **kwargs):
+    def __call__(self, *args, **kwargs):
         """
         Run the component with input ports filled from keyword arguments.
 
@@ -219,11 +220,11 @@ class Ports(object):
     """Port collection
     """
 
-    def __init__(self, port_class, owner):
+    def __init__(self, default_port_class, owner):
         # TODO port_class can differ for individual ports
         self._ports = ListDict()
         # port class is used to create new ports
-        self._port_class = port_class
+        self._default_port_class = default_port_class
         self._owner = owner
 
     def isempty(self):
@@ -245,8 +246,10 @@ class Ports(object):
     def values(self):
         return self._ports.values()
 
-    def __new_port(self, name, **kwargs):
-        return self._port_class(name=name, owner=self._owner, **kwargs)
+    def __new_port(self, name, port_class=None, **kwargs):
+        if port_class is None:
+            port_class = self._default_port_class
+        return port_class(name=name, owner=self._owner, **kwargs)
 
     def __getitem__(self, item):
         """
@@ -268,17 +271,19 @@ class Ports(object):
     def __str__(self):
         return "Ports: [" + ", ".join(self.keys()) + "]"
 
-    def insert_after(self, existing_port_name, new_port_name, replace_existing=False):
+    def insert_after(self, existing_port_name, new_port_name, replace_existing=False,
+                     port_class=None):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))
         self._ports.insert_after(
             existing_port_name,
-            (new_port_name, self.__new_port(new_port_name)))
+            (new_port_name, self.__new_port(new_port_name, port_class=port_class)))
 
-    def append(self, new_port_name, replace_existing=False, **kwargs):
+    def append(self, new_port_name, replace_existing=False, port_class=None, **kwargs):
         if not replace_existing and new_port_name in self._ports:
             raise Exception('Port {} already exists'.format(new_port_name))
-        self._ports[new_port_name] = self.__new_port(new_port_name, **kwargs)
+        self._ports[new_port_name] = self.__new_port(new_port_name, port_class=port_class,
+                                                     **kwargs)
 
     def keys(self):
         return list(self._ports.keys())
@@ -293,15 +298,12 @@ class Port(object):
     """Represents a single input/output actor port
     """
 
-    def __init__(self, name, owner, persistent=False, default=NoValue):
+    def __init__(self, name, owner):
         assert is_valid_port_name(name)
         self.name = name
         self.owner = owner
-        self.persistent = persistent
         self.buffer = deque()
-        self._default = default
         self._connections = []
-        self._last_value = NoValue
 
     @property
     def default(self):
@@ -348,8 +350,7 @@ class Port(object):
     def isempty(self):
         """True if the port buffer is empty
         """
-        if self.buffer or has_value(self._default) or (
-                    self.persistent and has_value(self._last_value)):
+        if self.buffer:
             return False
         else:
             return True
@@ -367,21 +368,9 @@ class Port(object):
     def pop(self):
         """Get single input
         """
-        res = NoValue
         if self.buffer:
             # input item is in the buffer
-            res = self.buffer.popleft()
-            if self.persistent:
-                self._last_value = res
-        elif self.persistent and has_value(self._last_value):
-            # persistent port, last value exists
-            res = self._last_value
-        elif has_value(self._default):
-            # port with default value
-            res = self._default
-        # chack whether any result value is available
-        if has_value(res):
-            return res
+            return self.buffer.popleft()
         else:
             raise IndexError('Port buffer is empty')
 
@@ -413,6 +402,14 @@ class InPort(Port):
     """A single, named input port
     """
 
+    def __init__(self, name, owner):
+        super().__init__(name=name, owner=owner)
+
+    def isempty(self):
+        """True if the port buffer is empty
+        """
+        return not self.buffer
+
     def __iadd__(self, other):
         self.connect(other)
         # self must be returned because __setattr__ or __setitem__ is finally used
@@ -430,6 +427,53 @@ class InPort(Port):
         :return: Whether the actor is ready to perform
         """
         self.buffer.append(value)
+        return self.owner.can_run()
+
+
+class FrozenInPort(InPort):
+    """A single, named input port with frozen first input
+
+    This port has to receive the input value exactly once.
+    """
+
+    def __init__(self, name, owner, value=NoValue):
+        super().__init__(name=name, owner=owner)
+        self._last_value = value
+
+    def isempty(self):
+        """True if the port buffer is empty
+        """
+        return not has_value(self._last_value)
+
+    def pop(self):
+        """Get single input
+        """
+        if self.isempty():
+            raise IndexError('Port is empty')
+        return self._last_value
+
+    def pop_all(self):
+        """Get all values
+        """
+        if self.isempty():
+            return IndexError('Port is empty')
+        return deque((self._last_value, ))
+        # TODO reset here?
+
+    def reset(self):
+        """Reset the value
+        """
+        self._last_value = NoValue
+
+    def put(self, value):
+        """Put single input
+
+        :rtype: bool
+        :return: Whether the actor is ready to perform
+        """
+        if has_value(self._last_value):
+            raise IndexError('FrozenInPort get value only once')
+        self._last_value = value
         return self.owner.can_run()
 
 
@@ -499,7 +543,7 @@ def build_nx_graph(actor):
                 if not port.connections:
                     # terminal node
                     attrs["style"] = "filled"
-                    attrs["color"] = "#ffffff"
+                    attrs["color"] = "#ADFF2F"
                 else:
                     attrs["color"] = "#9ed8f5"
                 graph.add_node(_get_name(port), type='port', ref=port,
@@ -524,6 +568,8 @@ def draw_graph(graph, layout='spectral', with_labels=True, node_size=500,
         kwargs.update(pos_kwargs)
     if layout == 'spectral':
         lfunc = functools.partial(nx.spectral_layout, **kwargs)
+    elif layout == 'spring':
+        lfunc = functools.partial(nx.spring_layout, **kwargs)
     else:
         raise ValueError('{} layout not supported'.format(layout))
 

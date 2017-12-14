@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from wowp.actors import FuncActor
-from wowp.schedulers import IPyClusterScheduler, FuturesScheduler, LinearizedScheduler
+from wowp.schedulers import FuturesScheduler, LinearizedScheduler
 from wowp.logger import logger
 
 
@@ -85,8 +85,7 @@ if __name__ == '__main__':
     for case in (tests):
         print('testing {}'.format(case))
         for scheduler in (LinearizedScheduler(),
-                          IPyClusterScheduler(),
-                          FuturesScheduler('distributed', executor_kwargs=dict(uris='127.0.01:8786')),
+                          # FuturesScheduler('distributed', executor_kwargs=dict(uris='127.0.01:8786')),
                           FuturesScheduler('ipyparallel', timeout=1),):
             # FuturesScheduler('multiprocessing'), ):
             print('using {}'.format(type(scheduler)))

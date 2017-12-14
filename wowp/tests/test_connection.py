@@ -20,12 +20,13 @@ def test_linear():
     assert a1.outports['out_port'].is_connected_to(a2.inports['in_port'])
 
 
-def test_persistent_port():
+def test_frozen_port():
+    from wowp.components import FrozenInPort
     actor = Sink()
-    actor.inports.append('in_port', persistent=True)
-    assert actor.inports['in_port'].persistent
+    actor.inports.append('in_port', port_class=FrozenInPort)
     # the port should be empty now
     assert actor.inports['in_port'].isempty()
+    assert_raises(IndexError, actor.inports.in_port.pop)
     value = randint(-100, 100)
     actor.inports.in_port.put(value)
     assert actor.inports.in_port.pop() == value
@@ -33,20 +34,8 @@ def test_persistent_port():
     assert actor.inports.in_port.pop() == value
     # and this should evaluate to True
     assert not actor.inports['in_port'].isempty()
-    # try to switch off the persistence
-    actor.inports['in_port'].persistent = False
-    assert_raises(IndexError, actor.inports.in_port.pop)
-    assert actor.inports['in_port'].isempty()
-
-
-def test_default_value_port():
-    actor = Sink()
-    actor.inports.append('in_port')
-    assert_raises(AttributeError, getattr, actor.inports.in_port, 'default')
-    value = randint(-100, 100)
-    actor.inports.in_port.default = value
-    assert actor.inports.in_port.default == value
-    assert actor.inports.in_port.pop() == value
+    # put is allowed only once
+    assert_raises(IndexError, actor.inports.in_port.put, value)
 
 
 if __name__ == '__main__':

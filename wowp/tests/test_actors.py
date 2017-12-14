@@ -10,24 +10,13 @@ from nose.plugins.skip import SkipTest
 import six
 
 
-def test_FuncActor_return_annotation():
-    if six.PY2:
+if six.PY2:
+
+    def test_FuncActor_return_annotation():
         raise SkipTest
-    def func(x, y):
-        return x + 1, y + 2
 
-    x, y = 2, 3.1
-
-    fa = FuncActor(func, outports=('a', 'b'))
-    fa.inports.x.put(x)
-    fa.inports.y.put(y)
-
-    NaiveScheduler().run_actor(fa)
-
-    a, b = func(x, y)
-
-    assert (fa.outports.a.pop() == a)
-    assert (fa.outports.b.pop() == b)
+    def test_ignore_PEP_484_annotations():
+        raise SkipTest
 
 
 def test_FuncActor_call():

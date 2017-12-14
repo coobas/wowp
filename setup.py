@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 from _wowp_setup import get_version
 import os
 
-setup(
+options = dict(
     name='wowp',
     version=get_version(),
     packages=find_packages(),
@@ -22,15 +22,22 @@ setup(
         'six',
         'click',
     ],
-    extras_require={'parallel': ['ipyparallel', 'mpi4py']},
+    extras_require={
+        'parallel': ['ipyparallel', 'mpi4py'],
+        'distributed': ['distributed'],
+        'julia': ['julia'],
+        'matlab': ['matlab', 'stopit']
+    },
     entry_points={
         # 'console_scripts' : [
         #    'wowp = wowp:function_that_does_it_all'
         # ]
     },
     classifiers=[
-        "Programming Language :: Python :: 2.7", "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5", "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: MIT License", "Operating System :: OS Independent",
         "Intended Audience :: Developers", "Intended Audience :: Information Technology",
         "Intended Audience :: Science/Research", "Topic :: Scientific/Engineering",
@@ -38,3 +45,7 @@ setup(
     ],
     test_suite='nose.collector',
     tests_require='nose>=1.0')
+
+options["extras_require"]["all"] = [library for value in options["extras_require"].values() for library in value]
+
+setup(**options)

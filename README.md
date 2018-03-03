@@ -27,7 +27,7 @@ Installation
 Using pip + latest development version:
 
 ``` {.sourceCode .bash}
-pip install hg+https://urbanj@bitbucket.org/urbanj/wowp
+pip install git+https://github.com/coobas/wowp.git
 ```
 
 Using pypi (may be outdated)

@@ -27,7 +27,7 @@ Source code
 -----------
 
 Wowp is an open-source project, licensed undet the MIT License. 
-The source code is available from  `Bitbucket <http://bitbucket.org/urbanj/wowp>`_.
+The source code is available from  `Github <https://github.com/coobas/wowp>`_.
 
 Prerequisites
 -------------

@@ -1,0 +1,9 @@
+
+*.pyc
+*.egg-info
+.idea/*
+notebooks/.ipynb_checkpoints
+doc/_build
+notebooks/Tutorial/.ipynb_checkpoints
+doc/apidoc
+doc/Tutorial/*

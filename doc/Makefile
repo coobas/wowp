@@ -181,4 +181,5 @@ apidoc:
 	$(APIDOC) -o apidoc ..
 
 tutorial:
-	cd Tutorial && ipython nbconvert --to rst ../../notebooks/Tutorial/*.ipynb
+	mkdir -p Tutorial
+	cd Tutorial && jupyter nbconvert --to rst --output-dir='.' ../../notebooks/Tutorial/*.ipynb

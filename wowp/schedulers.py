@@ -12,6 +12,7 @@ import traceback
 from .logger import logger
 import os
 import random
+import concurrent.futures
 
 try:
     import ipyparallel
@@ -436,7 +437,7 @@ class IpyparallelExecutor(object):
         # TODO this is likely not good - data will have to travel too much
         lv = self._ipy_lv[self._rotate_client()]
         job = lv.apply_async(func, *args, **kwargs)
-        return FutureIpyJob(job)
+        return job
 
 
 class FutureJob(object):
@@ -470,23 +471,6 @@ class LocalFutureJob(object):
 
     def display_outputs(self):
         pass
-
-
-class FutureIpyJob(object):
-    """Wraps asynchronous results of different kinds into a future-like object
-    """
-
-    def __init__(self, job):
-        self._job = job
-
-    def done(self):
-        return self._job.ready()
-
-    def result(self, timeout=None):
-        return self._job.get()
-
-    def display_outputs(self):
-        return self._job.display_outputs()
 
 
 class FutureMPIJob(object):
@@ -642,53 +626,51 @@ class FuturesScheduler(_ActorRunner):
             self._try_empty_wait_queue()
             self._try_empty_ready_jobs()
 
-            # TODO fix against spamming engines - PROBABLY NOT THE BEST WAY!
-            if self.nothing:
-                # use constant sleep time
-                logger.debug('scheduler sleeps for {} s'.format(
-                    self.last_sleep))
-                time.sleep(self.last_sleep)
-
-                # TODO could we use callbacks?
-
     def _try_empty_ready_jobs(self):
-        pending = {}  # temporary container
-        for actor, job_description in self.running_actors.items():
+        if not self.running_actors:
+            return
 
-            job = job_description['job']
-
-            if job.done():
-                self.nothing = False
-                # process result
-                # raise RemoteError in case of failure
-                try:
-                    result = job.result()
-                except Exception:
-                    logger.error('actor {} failed\n{}'.format(
-                        actor.name, traceback.format_exc()))
-                    self.reset()
-                    raise
-                if self.display_outputs:
-                    job.display_outputs()
-                if result:
-                    # empty results don't need any processing
-                    out_names = actor.outports.keys()
-                    if not hasattr(result, 'items'):
-                        raise ValueError(
-                            'The execute method must return '
-                            'a dict-like object with items method')
-                    for name, value in result.items():
-                        if name in out_names:
-                            outport = actor.outports[name]
-                            outport.put(value)
-                            self.on_outport_put_value(outport)
-                        else:
-                            raise ValueError("{} not in output ports".format(
-                                name))
-
+        # TODO could we use callbacks?
+        jobs = [job_description['job'] for job_description in self.running_actors.values()]
+        # wait for the first completed job
+        done, not_done = concurrent.futures.wait(jobs, timeout=None,
+                                                 return_when=concurrent.futures.FIRST_COMPLETED)
+        for job in done:
+            # TODO implement a better way to find actor by its job object
+            for actor, job_description in self.running_actors.items():
+                if job == job_description['job']:
+                    break
             else:
-                pending[actor] = job_description
-        self.running_actors = pending
+                raise RuntimeError("job's actor not found")
+            # delete the completed job from running_actors
+            del self.running_actors[actor]
+            self.nothing = False
+            # process result
+            # raise RemoteError in case of failure
+            try:
+                result = job.result()
+            except Exception:
+                logger.error('actor {} failed\n{}'.format(
+                    actor.name, traceback.format_exc()))
+                self.reset()
+                raise
+            if self.display_outputs:
+                job.display_outputs()
+            if result:
+                # empty results don't need any processing
+                out_names = actor.outports.keys()
+                if not hasattr(result, 'items'):
+                    raise ValueError(
+                        'The execute method must return '
+                        'a dict-like object with items method')
+                for name, value in result.items():
+                    if name in out_names:
+                        outport = actor.outports[name]
+                        outport.put(value)
+                        self.on_outport_put_value(outport)
+                    else:
+                        raise ValueError("{} not in output ports".format(
+                            name))
 
     def _try_empty_wait_queue(self):
         pending = []  # temporary container

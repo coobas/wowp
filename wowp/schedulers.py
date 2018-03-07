@@ -166,11 +166,13 @@ class DistributedExecutor(object):
         timeout(float): time to wait for engines
     """
 
-    def __init__(self, uris, min_engines=1, timeout=60):
-        from distributed import Executor
+    def __init__(self, uris=None, min_engines=1, timeout=60):
+        from dask.distributed import Client
         if isinstance(uris, six.string_types):
             uris = (uris, )
-        self._clients = [Executor(addr) for addr in uris]
+        elif uris is None:
+            uris = (None, )
+        self._clients = [Client(addr) for addr in uris]
         self._current_cli = 0
         # TODO assure
 
@@ -184,8 +186,9 @@ class DistributedExecutor(object):
         """Submit a function: func(*args, **kwargs) and return a FutureJob.
         """
         cli = self._rotate_client()
-        job = cli.submit(func, *args, **kwargs)
-        return FutureJob(job)
+        executor = cli.get_executor()
+        job = executor.submit(func, *args, **kwargs)
+        return job
 
 
 class MultiprocessingExecutor(object):
@@ -564,7 +567,7 @@ class FuturesScheduler(_ActorRunner):
             if executor == 'multiprocessing':
                 self.executor = MultiprocessingExecutor(processes=min_engines)
             elif distributed is not None and executor == 'distributed':
-                self.executor = DistributedExecutor(uris=executor_kwargs['uris'],
+                self.executor = DistributedExecutor(uris=executor_kwargs.get('uris', None),
                                                     min_engines=min_engines,
                                                     timeout=timeout)
             elif ipyparallel is not None and executor == 'ipyparallel':

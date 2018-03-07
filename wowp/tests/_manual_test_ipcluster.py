@@ -77,6 +77,7 @@ def _run_linearity_test(scheduler, size=100, ntimes=1):
 
 
 if __name__ == '__main__':
+    # TODO use pytest + fixtures (get inspired by ipyparallel tests)
     tests = (
         _run_tree_512_test,
         lambda scheduler: _run_linearity_test(scheduler, size=100, ntimes=5),
@@ -85,8 +86,9 @@ if __name__ == '__main__':
     for case in (tests):
         print('testing {}'.format(case))
         for scheduler in (LinearizedScheduler(),
-                          # FuturesScheduler('distributed', executor_kwargs=dict(uris='127.0.01:8786')),
-                          FuturesScheduler('ipyparallel', timeout=1),):
+                          FuturesScheduler('distributed'),
+                          FuturesScheduler('ipyparallel', timeout=1),
+                          ):
             # FuturesScheduler('multiprocessing'), ):
             print('using {}'.format(type(scheduler)))
             case(scheduler)

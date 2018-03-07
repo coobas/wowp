@@ -7,3 +7,4 @@ doc/_build
 notebooks/Tutorial/.ipynb_checkpoints
 doc/apidoc
 doc/Tutorial/*
+dask-worker-space

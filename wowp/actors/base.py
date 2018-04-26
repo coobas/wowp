@@ -7,7 +7,8 @@ import collections
 from ..logger import logger
 
 __all__ = ['FuncActor', 'Switch', 'ShellRunner', 'Sink',
-           'DictionaryMerge', 'DictionaryExtract', 'LoopWhile']
+           'DictionaryMerge', 'DictionaryExtract', 'LoopWhile',
+           'AnnotateInp']
 
 
 class FuncActor(Actor):
@@ -486,3 +487,54 @@ class LoopWhile(Actor):
         else:
             res = not self.inports['init'].isempty()
         return res
+
+
+class AnnotateInp(Actor):
+    """Simply pass input with run-time info"""
+
+    def __init__(self, max_sleep=0, name="AnnotateInp"):
+        super(AnnotateInp, self).__init__(name=name)
+        self.max_sleep = max_sleep
+        self.inports.append('inp')
+        self.outports.append('out')
+
+    def get_run_args(self):
+        return (), {
+            "inp": self.inports['inp'].pop(),
+            "max_sleep": self.max_sleep,
+            "name": self.name,
+        }
+
+    @staticmethod
+    def run(*args, **kwargs):
+        import os
+        import datetime
+        import platform
+        import time
+        import random
+        try:
+            import mpi4py
+            comm = mpi4py.MPI.COMM_WORLD
+            size = comm.size
+            rank = comm.rank
+        except ImportError:
+            size = None
+            rank = None
+
+        inp = kwargs["inp"]
+        max_sleep = kwargs["max_sleep"]
+        name = kwargs["name"]
+
+        res = {
+            'name': name,
+            'pid': os.getpid(),
+            'ppid': os.getppid(),
+            'time_in': datetime.datetime.now(),
+            'mpi_rank': rank,
+            'mpi_size': size,
+            'node': platform.node(),
+            'inp': inp,
+        }
+        time.sleep(random.random() * max_sleep)
+        res['time_out'] = datetime.datetime.now()
+        return {'out': res}

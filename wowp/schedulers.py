@@ -210,9 +210,6 @@ class MPIExecutor(object):
     """Executes jobs in local subprocesses using concurrent.futures
     """
 
-    _jobid_counter = itertools.count()
-    available_workers = []
-
     def __init__(self, max_workers=None):
         self.mpi_comm = mpi4py.MPI.COMM_WORLD
         self.mpi_size = self.mpi_comm.size
